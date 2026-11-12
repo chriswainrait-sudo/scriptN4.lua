@@ -5909,6 +5909,42 @@ function NexusUI:CreateWindow(options)
             return dropdown
         end
 
+        function tabObject:AddParagraph(data)
+            local panel = Instance.new("Frame")
+            panel.Size = UDim2.new(1, 0, 0, 0)
+            panel.AutomaticSize = Enum.AutomaticSize.Y
+            panel.BackgroundTransparency = GUI_BUTTON_TRANSPARENCY
+            panel.BorderSizePixel = 0
+            panel.LayoutOrder = #controls + 1
+            NexusUI:BindColor(panel, "BackgroundColor3", function() return COLOR_CONTROL end)
+            panel.Parent = getControlParent()
+            local layout = Instance.new("UIListLayout")
+            layout.Padding = UDim.new(0, 5)
+            layout.SortOrder = Enum.SortOrder.LayoutOrder
+            layout.Parent = panel
+            local padding = Instance.new("UIPadding")
+            padding.PaddingLeft, padding.PaddingRight = UDim.new(0, 8), UDim.new(0, 8)
+            padding.PaddingTop, padding.PaddingBottom = UDim.new(0, 8), UDim.new(0, 8)
+            padding.Parent = panel
+            local function label(text, order, dim)
+                local line = Instance.new("TextLabel")
+                line.Size = UDim2.new(1, 0, 0, 0)
+                line.AutomaticSize = Enum.AutomaticSize.Y
+                line.BackgroundTransparency = 1
+                line.LayoutOrder = order
+                line.Text, line.TextSize, line.TextWrapped = tostring(text or ""), 11, true
+                line.TextXAlignment = Enum.TextXAlignment.Left
+                line.FontFace = Font.new(FONT_BODY, Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+                NexusUI:BindColor(line, "TextColor3", function() return dim and COLOR_TEXT_DIM or COLOR_TEXT end)
+                line.Parent = panel
+                return line
+            end
+            local title, content = label(data and data.Title, 1, false), label(data and data.Content, 2, true)
+            table.insert(controls, panel)
+            return {Frame = panel, SetTitle = function(_, text) title.Text = tostring(text or "") end,
+                SetDesc = function(_, text) content.Text = tostring(text or "") end}
+        end
+
         function tabObject:AddButton(data)
             local hasDesc = data and data.Description and data.Description ~= ""
 
