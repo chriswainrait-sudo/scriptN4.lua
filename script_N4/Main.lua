@@ -125,19 +125,300 @@ local Window = LiquidationLib:CreateWindow({
 });
 
 --// Survivor Module //--
+LiquidationLib:RegisterUnloadCallback(function()
+    for _, module in pairs(Liquidation.Modules) do
+        if type(module.Cleanup) == "function" then pcall(module.Cleanup) end
+    end
+    for _, connection in pairs(Liquidation.Connections) do Liquidation.safeDisconnect(connection) end
+end)
+Liquidation.Connections.Camera = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    Liquidation.Camera = workspace.CurrentCamera
+end)
+
+local restores = {}
+local function fixNetMotion()
+    local folder = ReplicatedStorage:FindFirstChild("Modules")
+    local object = folder and folder:FindFirstChild("NetMotion")
+    if not object or type(getfenv) ~= "function" or type(setfenv) ~= "function" then return end
+    local ok, module = pcall(require, object)
+    if not ok or type(module) ~= "table" or type(module.push) ~= "function" then return end
+    local push = module.push
+    local success, original = pcall(getfenv, push)
+    if not success or type(original) ~= "table" then return end
+    local nativeMath = original.math or math
+    local scopedMath = setmetatable({clamp = function(value, low, high)
+        if type(low) == "number" and type(high) == "number" and high < low then high = low end
+        return nativeMath.clamp(value, low, high)
+    end}, {__index = nativeMath})
+    local scope = setmetatable({math = scopedMath}, {__index = original})
+    if pcall(setfenv, push, scope) then
+        restores[#restores + 1] = function()
+            if getfenv(push) == scope then setfenv(push, original) end
+        end
+    end
+end
+fixNetMotion()
+LiquidationLib:RegisterUnloadCallback(function()
+    for index = #restores, 1, -1 do pcall(restores[index]) end
+end)
+local Motion = {Requests = {}, PauseUntil = 0, Fly = false, NextAttack = 0}
+Liquidation.Motion = Motion
+local function finite(value) return type(value) == "number" and value == value and math.abs(value) < math.huge end
+function Motion:IsBlocked(character)
+    if not character then return true end
+    for _, name in ipairs({"Immobile", "IsStunned", "IsCarried", "IsCarrying", "IsHooked", "IsTrapped"}) do
+        if character:GetAttribute(name) == true then return true end
+    end
+    local action = character:FindFirstChild("CheckInterractable")
+    return action and action:GetAttribute("action") == true or false
+end
+function Motion:Bind()
+    local character = Player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if self.Character ~= character or self.Humanoid ~= humanoid then
+        self.Character, self.Humanoid = character, humanoid
+        self.Baseline = humanoid and humanoid.WalkSpeed or 16
+        self.LastApplied, self.CorrectionCap, self.Goal = nil, nil, nil
+    end
+    return character, humanoid
+end
+function Motion:BaseSpeed(character, humanoid)
+    local speed = character and character:GetAttribute("Speed")
+    local boost = character and character:GetAttribute("speedboost")
+    if not finite(speed) or speed <= 0 then speed = self.Baseline or 16 end
+    if not finite(boost) or boost <= 0 then boost = 1 end
+    return math.max(1, speed * boost)
+end
+function Motion:SafeSpeed(requested, character)
+    local allowed = character and character:GetAttribute("AC_AllowedSpeed")
+    if finite(allowed) and allowed >= 0 then requested = math.min(requested, allowed) end
+    if finite(self.CorrectionCap) then requested = math.min(requested, self.CorrectionCap) end
+    return math.clamp(requested, 0, 250)
+end
+function Motion:Set(name, request) self.Requests[name] = request end
+function Motion:Remove(name) self.Requests[name] = nil end
+function Motion:Restore()
+    local humanoid = self.Humanoid
+    if humanoid and humanoid.Parent and self.LastApplied and math.abs(humanoid.WalkSpeed - self.LastApplied) < 0.05 then
+        humanoid.WalkSpeed = self.Baseline or 16
+    end
+    self.LastApplied = nil
+end
+Liquidation.Connections.Motion = RunService.Heartbeat:Connect(function(dt)
+    local character, humanoid = Motion:Bind()
+    if not character or not humanoid or humanoid.Health <= 0 then return end
+    local role = Player.Team and Player.Team.Name:lower() or ""
+    local base, goal, active = Motion:BaseSpeed(character, humanoid), 0, false
+    for _, request in pairs(Motion.Requests) do
+        if not request.Role or role:find(request.Role, 1, true) then
+            active = true
+            goal = math.max(goal, request.Speed or base * (request.Multiplier or 1), request.Floor or 0)
+        end
+    end
+    if not active then Motion:Restore(); return end
+    if Motion.Fly or os.clock() < Motion.PauseUntil or Motion:IsBlocked(character) then Motion.LastApplied = nil; return end
+    goal = Motion:SafeSpeed(goal, character)
+    Motion.Goal, Motion.LastMovedAt = goal, os.clock()
+    local value = humanoid.WalkSpeed + (goal - humanoid.WalkSpeed) * (1 - math.exp(-12 * math.min(dt, 0.1)))
+    if math.abs(value - goal) < 0.05 then value = goal end
+    humanoid.WalkSpeed, Motion.LastApplied = value, value
+end)
+local TeleportGuard = {Enabled = true, Character = Player.Character, Born = os.clock(), Hooked = {}, Records = {}, NextScan = 0}
+Liquidation.TeleportGuard = TeleportGuard
+function TeleportGuard:ShouldBlock(frame, character)
+    if not self.Enabled or character ~= Player.Character or typeof(frame) ~= "CFrame" then return false end
+    if self.Character ~= character then self.Character, self.Born = character, os.clock(); return false end
+    if not character or os.clock() - self.Born < 2 or Motion:IsBlocked(character) then return false end
+    local role = Player.Team and Player.Team.Name:lower() or ""
+    if role:find("spectator", 1, true) or role == "" then return false end
+    local active = Motion.Fly
+    for _, request in pairs(Motion.Requests) do
+        if not request.Role or role:find(request.Role, 1, true) then active = true; break end
+    end
+    if not active then return false end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local distance = (root.Position - frame.Position).Magnitude
+    return finite(distance) and distance > 0.05 and distance <= 128
+end
+local teleport = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Teleport")
+if teleport and teleport:IsA("RemoteEvent") then
+    Liquidation.Connections.MotionCorrection = teleport.OnClientEvent:Connect(function(frame, character)
+        if TeleportGuard:ShouldBlock(frame, character) then return end
+        if character ~= Player.Character or typeof(frame) ~= "CFrame" then return end
+        local root = character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not root or not humanoid then return end
+        local distance = (root.Position - frame.Position).Magnitude
+        if distance > 2 and distance < 32 and (Motion.Fly or Motion.LastMovedAt and os.clock() - Motion.LastMovedAt < 0.5) then
+            local baseline = Motion:BaseSpeed(character, humanoid)
+            Motion.CorrectionCap = math.max(baseline, (Motion.Goal or humanoid.WalkSpeed) * 0.75)
+            Motion.FlyScale = math.max(0.15, (Motion.FlyScale or 1) * 0.65)
+        end
+        Motion.PauseUntil = os.clock() + 0.75
+        Motion.LastApplied = nil
+    end)
+end
+if teleport and teleport:IsA("RemoteEvent") then
+    local signal = teleport.OnClientEvent
+    local wrapClosure = newcclosure or function(callback) return callback end
+    local function filtered(callback)
+        return function(...)
+            if TeleportGuard:ShouldBlock(...) then return end
+            return callback(...)
+        end
+    end
+    local proxy = {}
+    function proxy:Connect(callback) return signal:Connect(filtered(callback)) end
+    function proxy:ConnectParallel(callback) return signal:ConnectParallel(filtered(callback)) end
+    function proxy:Once(callback) return signal:Once(filtered(callback)) end
+    function proxy:Wait()
+        while true do
+            local args = table.pack(signal:Wait())
+            if not TeleportGuard:ShouldBlock(table.unpack(args, 1, args.n)) then return table.unpack(args, 1, args.n) end
+        end
+    end
+    if type(hookmetamethod) == "function" then
+        local originalIndex
+        local wrappedIndex = wrapClosure(function(object, key)
+            if object == teleport and key == "OnClientEvent" then return proxy end
+            return originalIndex(object, key)
+        end)
+        local ok, original = pcall(hookmetamethod, game, "__index", wrappedIndex)
+        if ok and type(original) == "function" then
+            originalIndex = original
+            restores[#restores + 1] = function()
+                if type(getrawmetatable) == "function" then
+                    local mt = getrawmetatable(game)
+                    if mt and mt.__index == wrappedIndex then hookmetamethod(game, "__index", originalIndex) end
+                end
+            end
+        end
+    end
+    function TeleportGuard:Scan()
+        if type(getconnections) ~= "function" or type(hookfunction) ~= "function" then return end
+        local ok, connections = pcall(getconnections, signal)
+        if not ok or type(connections) ~= "table" then return end
+        for _, connection in ipairs(connections) do
+            local readable, callback = pcall(function() return connection.Function end)
+            if readable and type(callback) == "function" and not self.Hooked[callback] then
+                local original
+                local wrapped = wrapClosure(function(...)
+                    if TeleportGuard:ShouldBlock(...) then return end
+                    return original(...)
+                end)
+                local hooked, previous = pcall(hookfunction, callback, wrapped)
+                if hooked and type(previous) == "function" then
+                    original = previous
+                    self.Hooked[callback] = true
+                    self.Records[#self.Records + 1] = {Function = callback, Original = previous}
+                end
+            end
+        end
+    end
+    TeleportGuard:Scan()
+    Liquidation.Connections.TeleportGuard = RunService.Heartbeat:Connect(function()
+        if os.clock() >= TeleportGuard.NextScan then
+            TeleportGuard.NextScan = os.clock() + 2
+            TeleportGuard:Scan()
+        end
+    end)
+    LiquidationLib:RegisterUnloadCallback(function()
+        TeleportGuard.Enabled = false
+        for index = #TeleportGuard.Records, 1, -1 do
+            local item = TeleportGuard.Records[index]
+            pcall(hookfunction, item.Function, item.Original)
+        end
+        table.clear(TeleportGuard.Records)
+    end)
+end
+
+LiquidationLib:RegisterUnloadCallback(function() Motion:Restore(); table.clear(Motion.Requests) end)
+local cachedAttack, cachedAttackCharacter, nextAttackSearch
+local function upvalues(fn)
+    local read = getupvalues or debug and debug.getupvalues
+    if type(read) ~= "function" then return {} end
+    local ok, values = pcall(read, fn)
+    return ok and type(values) == "table" and values or {}
+end
+local function findAttack()
+    if cachedAttack and cachedAttackCharacter == Player.Character then return cachedAttack end
+    if os.clock() < (nextAttackSearch or 0) then return end
+    nextAttackSearch = os.clock() + 1
+    if type(getconnections) ~= "function" then return end
+    local signals = {UserInputService.InputBegan}
+    local gui = Player:FindFirstChildOfClass("PlayerGui")
+    if gui then
+        for _, button in ipairs(gui:GetDescendants()) do
+            if button:IsA("GuiButton") and button.Name:lower() == "attack" then signals[#signals + 1] = button.MouseButton1Down end
+        end
+    end
+    for _, signal in ipairs(signals) do
+        local ok, connections = pcall(getconnections, signal)
+        if ok and type(connections) == "table" then
+            for _, connection in ipairs(connections) do
+                local success, callback = pcall(function() return connection.Function end)
+                if success and type(callback) == "function" then
+                    for _, candidate in pairs(upvalues(callback)) do
+                        if type(candidate) == "function" then
+                            local context
+                            for _, value in pairs(upvalues(candidate)) do
+                                if type(value) == "table" and rawget(value, "character") == Player.Character
+                                    and type(rawget(value, "state")) == "table" and type(rawget(value, "remotes")) == "table"
+                                    and type(rawget(value, "canStartAction")) == "function" then context = value; break end
+                            end
+                            local attackState = false
+                            if context then
+                                for _, value in pairs(upvalues(candidate)) do
+                                    if value == context.state and type(rawget(value, "holdingAttack")) == "boolean"
+                                        and type(rawget(value, "attackTriggered")) == "boolean" then attackState = true; break end
+                                end
+                            end
+                            if context and attackState then
+                                cachedAttack, cachedAttackCharacter = {Handler = candidate, Context = context}, Player.Character
+                                return cachedAttack
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+function Liquidation.NativeAttack()
+    if os.clock() < Motion.NextAttack or UserInputService:GetFocusedTextBox() then return false end
+    local attack = findAttack()
+    if not attack then return false end
+    local context, character = attack.Context, Player.Character
+    if context.character ~= character or Motion:IsBlocked(character) then return false end
+    if context.isAttackLocked and context.isAttackLocked() or not context.canStartAction() then return false end
+    local ok = pcall(attack.Handler, Enum.UserInputState.Begin, nil)
+    if not ok or not context.state.holdingAttack then return false end
+    Motion.NextAttack = os.clock() + 0.6
+    task.delay(0.04, function()
+        if context.character == Player.Character then pcall(attack.Handler, Enum.UserInputState.End, nil) end
+    end)
+    return true
+end
+
 local SurvivorModule = loadModule("Survivor");
+Liquidation.Modules.Survivor = SurvivorModule
 
 --// Killer Module //--
 local KillerModule = loadModule("Killer");
+Liquidation.Modules.Killer = KillerModule
 
 --// Movement Module //--
 local MovementModule = loadModule("Movement");
+Liquidation.Modules.Movement = MovementModule
 
 --// Fun Module //--
 local FunModule = loadModule("Fun");
+Liquidation.Modules.Fun = FunModule
 
 --// Visual Module //--
 local VisualModule = loadModule("Visual");
+Liquidation.Modules.Visual = VisualModule
 
 --// ═══════════════════════════════ //--
 --//        SURVIVOR TAB            //--
@@ -766,6 +1047,12 @@ local MovementMiscGroup = MovementTab:CreateGroup({
 });
 
 MovementMiscGroup:CreateToggle({
+    Name = `Block Teleport Corrections`,
+    Default = true,
+    Callback = function(value) TeleportGuard.Enabled = value == true end,
+});
+
+MovementMiscGroup:CreateToggle({
     Name = `No Clip`,
     Default = false,
     Callback = function(Value)
@@ -1275,12 +1562,4 @@ AdvancedESPGroup:CreateToggle({
 Liquidation.Window = Window
 Liquidation.Library = LiquidationLib
 Liquidation.Modules = {Survivor = SurvivorModule, Killer = KillerModule, Movement = MovementModule, Fun = FunModule, Visual = VisualModule}
-LiquidationLib:RegisterUnloadCallback(function()
-    for _, module in pairs(Liquidation.Modules) do
-        if type(module.Cleanup) == "function" then pcall(module.Cleanup) end
-    end
-    if type(VisualModule.StopESP) == "function" then pcall(VisualModule.StopESP) end
-    if type(VisualModule.StopAdvancedESP) == "function" then pcall(VisualModule.StopAdvancedESP) end
-    for _, connection in pairs(Liquidation.Connections) do Liquidation.safeDisconnect(connection) end
-end)
 return Liquidation
