@@ -36,7 +36,7 @@ end
 -- FAKE SAW --
 
 local UseFakeSaw = (function()
-    local enabled = false
+    local enabled, nextUse = false, 0
     local teamListeners = {}
     local connection = nil
     
@@ -67,9 +67,9 @@ local UseFakeSaw = (function()
             end
             
             connection = Liquidation.Services.RunService.Heartbeat:Connect(function()
-                if enabled and isKillerTeam() then
+                if enabled and isKillerTeam() and os.clock() >= nextUse then
+                    nextUse = os.clock() + 35
                     executeFakeSaw()
-                    task.wait(35)
                 end
             end)
         elseif enabled then
@@ -623,139 +623,19 @@ end)()
 
 local NoSlowdown = (function()
     local enabled = false
-    local slowdownConnection = nil
-    local originalSpeed = nil
-    local speedLocked = false
-    local teamListeners = {}
-
-    local function saveOriginalSpeed()
-        local humanoid = Liquidation.getHumanoid()
-        if humanoid then
-            originalSpeed = humanoid.WalkSpeed
-            speedLocked = false
-        end
-    end
-    
-    local function restoreOriginalSpeed()
-        local humanoid = Liquidation.getHumanoid()
-        if humanoid and originalSpeed then
-            humanoid.WalkSpeed = originalSpeed
-        end
-        speedLocked = false
-    end
-    
-    local function updateNoSlowdown()
-        if slowdownConnection then
-            slowdownConnection:Disconnect()
-            slowdownConnection = nil
-        end
-        
-        if enabled and isKillerTeam() then
-            saveOriginalSpeed()
-            
-            slowdownConnection = Liquidation.Services.RunService.Heartbeat:Connect(function()
-                if not enabled or not isKillerTeam() then return end
-                
-                local char = Liquidation.getCharacter()
-                if not char then return end
-                
-                local hum = Liquidation.getHumanoid()
-                if not hum then return end
-                
-                if hum.WalkSpeed < 16 then
-                    if originalSpeed and originalSpeed >= 16 then
-                        hum.WalkSpeed = originalSpeed
-                    else
-                        hum.WalkSpeed = 16
-                    end
-                    speedLocked = true
-                elseif not speedLocked and hum.WalkSpeed > (originalSpeed or 16) then
-                    originalSpeed = hum.WalkSpeed
-                end
-            end)
-            
-            local charAddedConnection
-            charAddedConnection = Liquidation.Player.CharacterAdded:Connect(function(newChar)
-                if enabled and isKillerTeam() then
-                    if slowdownConnection then
-                        slowdownConnection:Disconnect()
-                        slowdownConnection = nil
-                    end
-                    
-                    task.wait(1)
-                    
-                    saveOriginalSpeed()
-                    
-                    if enabled and isKillerTeam() then
-                        updateNoSlowdown()
-                    end
-                    
-                    if charAddedConnection then
-                        charAddedConnection:Disconnect()
-                    end
-                end
-            end)
-        elseif enabled then
-            restoreOriginalSpeed()
-        else
-            restoreOriginalSpeed()
-        end
-    end
-    
     local function Enable()
         if enabled then return end
         enabled = true
         Liquidation.States.NoSlowdownEnabled = true
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        
-        teamListeners = {}
-        
-        table.insert(teamListeners, setupTeamListener(updateNoSlowdown))
-        
-        updateNoSlowdown()
+        Liquidation.Motion:Set("KillerNoSlow", {Role = "killer", Multiplier = 1})
     end
-    
     local function Disable()
-        if not enabled then return end
         enabled = false
         Liquidation.States.NoSlowdownEnabled = false
-        
-        if slowdownConnection then
-            Liquidation.safeDisconnect(slowdownConnection)
-            slowdownConnection = nil
-        end
-        
-        restoreOriginalSpeed()
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        teamListeners = {}
+        Liquidation.Motion:Remove("KillerNoSlow")
     end
-    
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end
-    }
+    return {Enable = Enable, Disable = Disable, IsEnabled = function() return enabled end}
 end)()
-
--- HITBOX --
 
 local Hitbox = (function()
     local enabled = false
@@ -1267,249 +1147,110 @@ end)()
 -- =BEAT GAME (KILLER) --
 
 local BeatGameKiller = (function()
-    local enabled = false
-    local targetPlayer = nil
-    local teamListeners = {}
-
-    local function GetHealthPercent(hum)
-        if not hum or hum.MaxHealth <= 0 then return 0 end
-        return hum.Health / hum.MaxHealth
-    end
-
-    local function IsPlayerAlive(hum)
-        local pct = GetHealthPercent(hum)
-        return pct > 0.25
-    end
-
-    local function IsSurvivor(player)
-        if not player or not player.Team then return false end
-        local teamName = player.Team.Name:lower()
-        return teamName:find("survivor") or teamName == "survivors" or teamName == "survivor"
-    end
-
-    local function IsPlayerOnHook(player)
-        if not player or not player.Character then return false end
-        
+    local enabled, target, elapsed, pathAt, planning, generation = false, nil, 0, 0, false, 0
+    local points, pointIndex, pathGoal, listeners = {}, 1, nil, {}
+    local pathfinding = game:GetService("PathfindingService")
+    local function valid(player)
+        if not player or player == Liquidation.Player or not player.Team or not player.Team.Name:lower():find("survivor", 1, true) then return false end
         local character = player.Character
-        
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
-                if track.Animation then
-                    local animId = track.Animation.AnimationId:lower()
-                    if animId:find("hook") or animId:find("trap") or animId:find("hanging") then
-                        return true
-                    end
-                end
-            end
-        end
-        
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                local nameLower = part.Name:lower()
-                if nameLower:find("hook") or nameLower:find("trap") then
-                    return true
-                end
-            end
-        end
-        
-        if character:GetAttribute("IsOnHook") or character:GetAttribute("IsTrapped") then
-            return true
-        end
-        
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if rootPart then
-            for _, obj in ipairs(rootPart:GetChildren()) do
-                if obj.Name:lower():find("hook") or obj.Name:lower():find("trap") then
-                    return true
-                end
-            end
-        end
-        
-        return false
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        if not root or not humanoid or humanoid.Health <= 20 then return false end
+        return character:GetAttribute("IsHooked") ~= true and character:GetAttribute("IsCarried") ~= true and character:GetAttribute("IsTrapped") ~= true
     end
-
-    local function UpdateBeatGame()
-        if not enabled or not isKillerTeam() then 
-            targetPlayer = nil
-            return 
-        end
-        
-        local root = Liquidation.getRootPart()
-        if not root then return end
-        
-        local needNewTarget = true
-        
-        if targetPlayer and targetPlayer.Character then
-            local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local targetHum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-            
-            if targetRoot and targetHum and IsPlayerAlive(targetHum) and IsSurvivor(targetPlayer) then
-                if not IsPlayerOnHook(targetPlayer) then
-                    needNewTarget = false
-                else
-                    targetPlayer = nil
-                end
-            else
-                targetPlayer = nil
+    local function plan(root, goal)
+        if planning or os.clock() < pathAt then return end
+        pathAt, planning = os.clock() + 0.8, true
+        generation += 1
+        local token, origin, character = generation, root.Position, Liquidation.getCharacter()
+        task.spawn(function()
+            local path = pathfinding:CreatePath({AgentRadius = 1.8, AgentHeight = 5, AgentCanJump = true, WaypointSpacing = 4})
+            local ok = pcall(path.ComputeAsync, path, origin, goal)
+            if token == generation then
+                planning = false
+                if enabled and Liquidation.getCharacter() == character and ok and path.Status == Enum.PathStatus.Success then
+                    points, pointIndex, pathGoal = path:GetWaypoints(), 2, goal
+                else points, pointIndex = {}, 1 end
             end
-        end
-        
-        if needNewTarget then
-            local survivors = {}
-            
-            for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
-                if player ~= Liquidation.Player and IsSurvivor(player) and player.Character then
-                    local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                    local pHum = player.Character:FindFirstChildOfClass("Humanoid")
-                    
-                    if pRoot and pHum and IsPlayerAlive(pHum) then
-                        if not IsPlayerOnHook(player) then
-                            table.insert(survivors, player)
-                        end
-                    end
-                end
-            end
-            
-            if #survivors > 0 then
-                local closestDist = math.huge
-                local closest = nil
-                
-                for _, player in ipairs(survivors) do
-                    local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                    local dist = (pRoot.Position - root.Position).Magnitude
-                    if dist < closestDist then
-                        closestDist = dist
-                        closest = player
-                    end
-                end
-                
-                targetPlayer = closest
-            else
-                targetPlayer = nil
-                return
-            end
-        end
-        
-        if not targetPlayer or not targetPlayer.Character then return end
-        
-        local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local targetHum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if not targetRoot or not targetHum then 
-            targetPlayer = nil
-            return 
-        end
-        
-        if not IsPlayerAlive(targetHum) or IsPlayerOnHook(targetPlayer) then
-            targetPlayer = nil
-            return
-        end
-        
-        local char = Liquidation.getCharacter()
-        if char then
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = false end
-            end
-        end
-        
-        local targetPos = targetRoot.Position
-        local direction = (root.Position - targetPos).Unit
-        if direction.Magnitude ~= direction.Magnitude then 
-            direction = Vector3.new(1, 0, 0)
-        end
-        local offsetPos = targetPos + direction * 3 + Vector3.new(0, 1, 0)
-        
-        root.CFrame = CFrame.new(offsetPos, targetPos)
-        
-        pcall(function()
-            local remotes = Liquidation.Services.ReplicatedStorage:FindFirstChild("Remotes")
-            if remotes then
-                local attacks = remotes:FindFirstChild("Attacks")
-                if attacks then
-                    local basicAttack = attacks:FindFirstChild("BasicAttack")
-                    if basicAttack then
-                        basicAttack:FireServer(false)
-                    end
-                end
-            end
+            path:Destroy()
         end)
     end
-
-    local function updateBeatGameState()
-        if enabled and isKillerTeam() then
-            if not Killer.Connections.BeatGame then
-                Killer.Connections.BeatGame = Liquidation.Services.RunService.Heartbeat:Connect(UpdateBeatGame)
+    local function update(dt)
+        if not enabled or not isKillerTeam() or Liquidation.Motion.Fly then return end
+        local character, root, humanoid = Liquidation.getCharacter(), Liquidation.getRootPart(), Liquidation.getHumanoid()
+        if not character or not root or not humanoid or humanoid.Health <= 0 then return end
+        if os.clock() < Liquidation.Motion.PauseUntil or Liquidation.Motion:IsBlocked(character) then return end
+        elapsed += dt
+        if elapsed < 0.08 then return end
+        elapsed = 0
+        if not valid(target) then
+            target = nil
+            local nearest = math.huge
+            for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
+                if valid(player) then
+                    local distance = (player.Character.HumanoidRootPart.Position - root.Position).Magnitude
+                    if distance < nearest then nearest, target = distance, player end
+                end
             end
-        elseif enabled then
-            if Killer.Connections.BeatGame then
-                Killer.Connections.BeatGame:Disconnect()
-                Killer.Connections.BeatGame = nil
-            end
-            targetPlayer = nil
-        else
-            if Killer.Connections.BeatGame then
-                Killer.Connections.BeatGame:Disconnect()
-                Killer.Connections.BeatGame = nil
-            end
-            targetPlayer = nil
+            points, pointIndex, pathGoal, pathAt = {}, 1, nil, 0
         end
+        if not target then humanoid:Move(Vector3.zero, false); return end
+        local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then target = nil; return end
+        local offset = root.Position - targetRoot.Position
+        local horizontal = Vector3.new(offset.X, 0, offset.Z)
+        local distance = offset.Magnitude
+        if distance <= 4 then
+            humanoid:Move(Vector3.zero, false)
+            if horizontal.Magnitude > 0.01 then
+                root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetRoot.Position.X, root.Position.Y, targetRoot.Position.Z))
+            end
+            Liquidation.NativeAttack()
+            return
+        end
+        local direction = horizontal.Magnitude > 0.01 and horizontal.Unit or Vector3.new(1, 0, 0)
+        local goal = targetRoot.Position + direction * 2.8
+        if not pathGoal or (pathGoal - goal).Magnitude > 6 or #points == 0 then plan(root, goal) end
+        local point = points[pointIndex]
+        while point and (root.Position - point.Position).Magnitude <= 3 do
+            pointIndex += 1
+            point = points[pointIndex]
+        end
+        if point then
+            if point.Action == Enum.PathWaypointAction.Jump then humanoid.Jump = true end
+            humanoid:MoveTo(point.Position)
+        else humanoid:MoveTo(goal) end
     end
-
+    local function bind()
+        Liquidation.safeDisconnect(Killer.Connections.BeatGame)
+        Killer.Connections.BeatGame = nil
+        generation += 1
+        target, points, pathGoal, planning, pathAt = nil, {}, nil, false, 0
+        if enabled and isKillerTeam() then Killer.Connections.BeatGame = Liquidation.Services.RunService.Heartbeat:Connect(update) end
+    end
+    local function clearListeners()
+        for _, listener in ipairs(listeners) do
+            if type(listener) == "table" then for _, connection in ipairs(listener) do Liquidation.safeDisconnect(connection) end
+            else Liquidation.safeDisconnect(listener) end
+        end
+        table.clear(listeners)
+    end
     local function Enable()
         if enabled then return end
-        enabled = true
-        Liquidation.States.BeatGameKillerEnabled = true
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        
-        teamListeners = {}
-        
-        table.insert(teamListeners, setupTeamListener(updateBeatGameState))
-        
-        updateBeatGameState()
+        enabled, Liquidation.States.BeatGameKillerEnabled = true, true
+        clearListeners()
+        listeners[#listeners + 1] = setupTeamListener(bind)
+        bind()
     end
-
     local function Disable()
-        if not enabled then return end
-        enabled = false
-        Liquidation.States.BeatGameKillerEnabled = false
-        
-        if Killer.Connections.BeatGame then
-            Killer.Connections.BeatGame:Disconnect()
-            Killer.Connections.BeatGame = nil
-        end
-        
-        targetPlayer = nil
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        teamListeners = {}
+        enabled, Liquidation.States.BeatGameKillerEnabled = false, false
+        clearListeners()
+        bind()
+        local humanoid = Liquidation.getHumanoid()
+        if humanoid then humanoid:Move(Vector3.zero, false) end
     end
-
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end,
-        GetCurrentTarget = function() return targetPlayer end
-    }
+    return {Enable = Enable, Disable = Disable, IsEnabled = function() return enabled end, GetCurrentTarget = function() return target end}
 end)()
-
--- ABYSSWALKER NO CD --
 
 local AbysswalkerCorrupt = (function()
     local enabled = false
