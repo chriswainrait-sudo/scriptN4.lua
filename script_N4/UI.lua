@@ -6922,10 +6922,8 @@ function Library:CreateColorPicker(row, config, nativeTab, id)
                 if not popup.Target or not frame.Visible then popup.Drag = nil; return end
                 local object = popup.Drag == "SV" and plane or hue
                 local position = input.Position
-                local root = frame:FindFirstAncestorOfClass("ScreenGui")
-                local inset = root and not root.IgnoreGuiInset and UIEnvironment.GuiService:GetGuiInset() or Vector2.zero
                 local x = math.clamp((position.X - object.AbsolutePosition.X) / math.max(object.AbsoluteSize.X, 1), 0, 1)
-                local y = math.clamp((position.Y - inset.Y - object.AbsolutePosition.Y) / math.max(object.AbsoluteSize.Y, 1), 0, 1)
+                local y = math.clamp((position.Y - object.AbsolutePosition.Y) / math.max(object.AbsoluteSize.Y, 1), 0, 1)
                 local h, s, v = popup.H, popup.S, popup.V
                 if popup.Drag == "SV" then s, v = x, 1 - y else h = y end
                 popup.Target:Set(Color3.fromHSV(h, s, v))
@@ -6933,15 +6931,19 @@ function Library:CreateColorPicker(row, config, nativeTab, id)
             for object, kind in pairs({[plane] = "SV", [hue] = "Hue"}) do
                 UIEnvironment.TrackGuiConnection(object.InputBegan:Connect(function(input)
                     if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+                    if popup.Drag and input ~= popup.Input then return end
                     popup.Drag, popup.Input = kind, input
                     drag(input)
                 end))
             end
             UIEnvironment.TrackGuiConnection(UIEnvironment.userInputService.InputChanged:Connect(function(input)
-                if popup.Drag and (input == popup.Input or input.UserInputType == Enum.UserInputType.MouseMovement) then drag(input) end
+                if not popup.Drag or not popup.Input then return end
+                if input == popup.Input or popup.Input.UserInputType == Enum.UserInputType.MouseButton1
+                    and input.UserInputType == Enum.UserInputType.MouseMovement then drag(input) end
             end))
             UIEnvironment.TrackGuiConnection(UIEnvironment.userInputService.InputEnded:Connect(function(input)
-                if input == popup.Input or input.UserInputType == Enum.UserInputType.MouseButton1 then popup.Drag, popup.Input = nil, nil end
+                if input == popup.Input or popup.Input and popup.Input.UserInputType == Enum.UserInputType.MouseButton1
+                    and input.UserInputType == Enum.UserInputType.MouseButton1 then popup.Drag, popup.Input = nil, nil end
             end))
             UIEnvironment.TrackGuiConnection(main:GetPropertyChangedSignal("Visible"):Connect(function()
                 if not main.Visible then frame.Visible = false; popup.Drag = nil end
@@ -7024,11 +7026,12 @@ local function groupAdapter(native, tabName, data)
     end
     function group:CreateLabel(config)
         selectSection()
-        return native:AddParagraph({Title = "", Content = config.Text or ""})
+        local label = native:AddParagraph({Title = "", Content = config.Text or ""})
+        label.Frame.BackgroundTransparency = 1
+        return label
     end
     function group:CreateSeparator(config)
-        selectSection()
-        return native:AddParagraph({Title = config.Text or "", Content = ""})
+        return nil
     end
     function group:CreateKeybind(config)
         if UIEnvironment.IS_MOBILE then return end
