@@ -841,134 +841,19 @@ end)()
 
 local NoSlowdown = (function()
     local enabled = false
-    local connection = nil
-    local teamListeners = {}
-
-    local function setupNoSlowdownForCharacter(character)
-        if not enabled or not isSurvivorTeam() then return end
-        
-        task.wait(0.5) 
-        
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid:SetAttribute("NoSlowdown", true)
-            humanoid.WalkSpeed = 16
-            
-            if connection then
-                connection:Disconnect()
-            end
-            
-            connection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-                if enabled and isSurvivorTeam() and humanoid and humanoid.WalkSpeed ~= 16 then
-                    humanoid.WalkSpeed = 16
-                end
-            end)
-            
-            humanoid.Died:Connect(function()
-                if enabled then
-                    task.wait(2) 
-                    local newChar = Liquidation.getCharacter()
-                    if newChar then
-                        setupNoSlowdownForCharacter(newChar)
-                    end
-                end
-            end)
-        end
-    end
-    
-    local function updateNoSlowdownState()
-        if enabled and isSurvivorTeam() then
-            local character = Liquidation.getCharacter()
-            if character then
-                setupNoSlowdownForCharacter(character)
-            end
-        elseif enabled then
-            if connection then
-                connection:Disconnect()
-                connection = nil
-            end
-        else
-            if connection then
-                connection:Disconnect()
-                connection = nil
-            end
-            
-            local character = Liquidation.getCharacter()
-            if character then
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid:SetAttribute("NoSlowdown", nil)
-                end
-            end
-        end
-    end
-    
     local function Enable()
         if enabled then return end
         enabled = true
         Liquidation.States.NoSlowdownEnabled = true
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        
-        teamListeners = {}
-        
-        table.insert(teamListeners, setupTeamListener(updateNoSlowdownState))
-        
-        table.insert(teamListeners, setupCharacterListener(function(character)
-            if enabled and isSurvivorTeam() then
-                setupNoSlowdownForCharacter(character)
-            end
-        end))
-        
-        updateNoSlowdownState()
+        Liquidation.Motion:Set("SurvivorNoSlow", {Role = "survivor", Multiplier = 1})
     end
-    
     local function Disable()
-        if not enabled then return end
         enabled = false
         Liquidation.States.NoSlowdownEnabled = false
-        
-        if connection then
-            connection:Disconnect()
-            connection = nil
-        end
-        
-        local character = Liquidation.getCharacter()
-        if character then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:SetAttribute("NoSlowdown", nil)
-            end
-        end
-        
-            for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        teamListeners = {}
+        Liquidation.Motion:Remove("SurvivorNoSlow")
     end
-    
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end
-    }
+    return {Enable = Enable, Disable = Disable, IsEnabled = function() return enabled end}
 end)()
-
--- AUTO PARRY 
 
 local AutoParry = (function()
     local spamActive = false
@@ -2308,66 +2193,26 @@ end)()
 -- SPEED HACK [ATTRIBUTE] --
 
 local SpeedHackAttr = (function()
-    local enabled = false
-    local currentValue = 1.0
-    local connection = nil
-    local teamListeners = {}
-
-    local function applyAttribute()
-        if not enabled or not isSurvivorTeam() then return end
-        local char = Liquidation.getCharacter()
-        if not char then return end
-        pcall(function() char:SetAttribute("speedboost", currentValue) end)
+    local enabled, currentValue = false, 1
+    local function apply()
+        if enabled then Liquidation.Motion:Set("SpeedHack", {Role = "survivor", Multiplier = currentValue}) end
     end
-
-    local function updateState()
-        if connection then connection:Disconnect(); connection = nil end
-        if enabled and isSurvivorTeam() then
-            connection = Liquidation.Services.RunService.Heartbeat:Connect(applyAttribute)
-        else
-            local char = Liquidation.getCharacter()
-            if char then pcall(function() char:SetAttribute("speedboost", nil) end) end
-        end
-    end
-
     local function Enable()
-        if enabled then return end
-        enabled = true
-        Liquidation.States.SpeedHackAttrEnabled = true
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
-            else Liquidation.safeDisconnect(listener) end
-        end
-        teamListeners = {}
-        table.insert(teamListeners, setupTeamListener(updateState))
-        updateState()
+        enabled, Liquidation.States.SpeedHackAttrEnabled = true, true
+        apply()
     end
-
     local function Disable()
-        if not enabled then return end
-        enabled = false
-        Liquidation.States.SpeedHackAttrEnabled = false
-        if connection then connection:Disconnect(); connection = nil end
-        local char = Liquidation.getCharacter()
-        if char then pcall(function() char:SetAttribute("speedboost", nil) end) end
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
-            else Liquidation.safeDisconnect(listener) end
-        end
-        teamListeners = {}
+        enabled, Liquidation.States.SpeedHackAttrEnabled = false, false
+        Liquidation.Motion:Remove("SpeedHack")
     end
-
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end,
-        SetValue = function(v) currentValue = v; if enabled then applyAttribute() end end
-    }
+    local function SetValue(value)
+        value = tonumber(value)
+        if not value or value ~= value then return end
+        currentValue = math.clamp(value, 0.1, 10)
+        apply()
+    end
+    return {Enable = Enable, Disable = Disable, IsEnabled = function() return enabled end, SetValue = SetValue}
 end)()
-
--- VAULT DISTANCE --
 
 local VaultDistance = (function()
     local enabled = false
