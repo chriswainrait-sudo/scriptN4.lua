@@ -38,80 +38,27 @@ end
 -- WALK SPEED --
 
 local WalkSpeed = (function()
-    local WALKSPEED_ENABLED = false
-    local currentSpeed = 50
-    local speedConnection = nil
-    
-    local function EnableWalkSpeed()
-        if WALKSPEED_ENABLED then return end
-        
-        WALKSPEED_ENABLED = true
-        Movement.States.WalkSpeedEnabled = true
-        
-        speedConnection = Liquidation.Services.RunService.Heartbeat:Connect(function()
-            if not WALKSPEED_ENABLED or not Liquidation.Player.Character then
-                if speedConnection then
-                    speedConnection:Disconnect()
-                    speedConnection = nil
-                end
-                return
-            end
-            
-            local character = Liquidation.Player.Character
-            local rootPart = character:FindFirstChild("HumanoidRootPart")
-            if not rootPart then return end
-            
-            local direction = Vector3.new(0, 0, 0)
-            local camera = Liquidation.Services.Workspace.CurrentCamera
-            
-            if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                direction = direction + camera.CFrame.LookVector
-            end
-            if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                direction = direction - camera.CFrame.LookVector
-            end
-            if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                direction = direction - camera.CFrame.RightVector
-            end
-            if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                direction = direction + camera.CFrame.RightVector
-            end
-            
-            if direction.Magnitude > 0 then
-                direction = direction.Unit
-                local velocity = direction * currentSpeed
-                rootPart.Velocity = Vector3.new(velocity.X, rootPart.Velocity.Y, velocity.Z)
-            end
-        end)
+    local enabled, currentSpeed = false, 50
+    local function apply()
+        if enabled then Liquidation.Motion:Set("WalkSpeed", {Speed = currentSpeed}) end
     end
-    
-    local function DisableWalkSpeed()
-        if not WALKSPEED_ENABLED then return end
-        
-        WALKSPEED_ENABLED = false
-        Movement.States.WalkSpeedEnabled = false
-        
-        if speedConnection then
-            Liquidation.safeDisconnect(speedConnection)
-            speedConnection = nil
-        end
+    local function Enable()
+        enabled, Movement.States.WalkSpeedEnabled = true, true
+        apply()
     end
-    
-    local function SetSpeed(speed)
-        currentSpeed = tonumber(speed) or 50
+    local function Disable()
+        enabled, Movement.States.WalkSpeedEnabled = false, false
+        Liquidation.Motion:Remove("WalkSpeed")
+    end
+    local function SetSpeed(value)
+        value = tonumber(value)
+        if not value or value ~= value then return end
+        currentSpeed = math.clamp(value, 1, 250)
         Movement.Settings.walkSpeed = currentSpeed
+        apply()
     end
-    
-    return {
-        Enable = EnableWalkSpeed,
-        Disable = DisableWalkSpeed,
-        SetSpeed = SetSpeed,
-        IsEnabled = function() return WALKSPEED_ENABLED end,
-        GetSpeed = function() return currentSpeed end
-    }
+    return {Enable = Enable, Disable = Disable, SetSpeed = SetSpeed, GetSpeed = function() return currentSpeed end, IsEnabled = function() return enabled end}
 end)()
-
--- NO CLIP --
 
 local NoClip = (function()
     local noclipEnabled = false
@@ -207,93 +154,60 @@ end)()
 
 -- FLY --
 
+local flyHumanoid, flyAutoRotate, flyVelocity
+local function releaseFlyCharacter()
+    if flyHumanoid and flyHumanoid.Parent and flyAutoRotate ~= nil then flyHumanoid.AutoRotate = flyAutoRotate end
+    flyHumanoid, flyAutoRotate, flyVelocity = nil, nil, Vector3.zero
+end
 local function enableFly()
     if Movement.States.FlyEnabled then return end
-    Movement.States.FlyEnabled = true
-    
-    local character, humanoid, rootPart = Movement.GetCharacter(), Movement.GetHumanoid(), Movement.GetRootPart()
-    if not character or not humanoid or not rootPart then return end
-    
-    humanoid.PlatformStand = true
-    Movement.Objects.bodyVelocity = Instance.new("BodyVelocity")
-    Movement.Objects.bodyGyro = Instance.new("BodyGyro")
-    
-    Movement.Objects.bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    Movement.Objects.bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    Movement.Objects.bodyVelocity.Parent = rootPart
-    
-    Movement.Objects.bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    Movement.Objects.bodyGyro.P = 10000
-    Movement.Objects.bodyGyro.D = 500
-    Movement.Objects.bodyGyro.CFrame = rootPart.CFrame
-    Movement.Objects.bodyGyro.Parent = rootPart
-
-    Movement.Connections.flyLoop = Liquidation.Services.RunService.Heartbeat:Connect(function()
-        if not Movement.States.FlyEnabled or not Movement.Objects.bodyVelocity or not Movement.Objects.bodyGyro or 
-           not character or not humanoid or not rootPart then
-            if Movement.Connections.flyLoop then
-                Movement.Connections.flyLoop:Disconnect()
-                Movement.Connections.flyLoop = nil
-            end
+    Movement.States.FlyEnabled, Liquidation.Motion.Fly = true, true
+    Liquidation.Motion.FlyScale = 1
+    flyVelocity = Vector3.zero
+    local event = Liquidation.Services.RunService.PreSimulation or Liquidation.Services.RunService.Heartbeat
+    Movement.Connections.flyLoop = event:Connect(function(dt)
+        if not Movement.States.FlyEnabled then return end
+        local character, humanoid, root = Movement.GetCharacter(), Movement.GetHumanoid(), Movement.GetRootPart()
+        if not character or not humanoid or not root or humanoid.Health <= 0 then releaseFlyCharacter(); return end
+        if flyHumanoid ~= humanoid then
+            releaseFlyCharacter()
+            flyHumanoid, flyAutoRotate = humanoid, humanoid.AutoRotate
+        end
+        if os.clock() < Liquidation.Motion.PauseUntil or Liquidation.Motion:IsBlocked(character) then
+            flyVelocity = Vector3.zero
+            humanoid.AutoRotate = flyAutoRotate
             return
         end
-        
         local camera = Liquidation.Services.Workspace.CurrentCamera
-        local direction = Vector3.new(0, 0, 0)
-        
-        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then 
-            direction = direction + camera.CFrame.LookVector 
-        end
-        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then 
-            direction = direction - camera.CFrame.LookVector 
-        end
-        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then 
-            direction = direction - camera.CFrame.RightVector 
-        end
-        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then 
-            direction = direction + camera.CFrame.RightVector 
-        end
-        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
-            direction = direction + Vector3.new(0, 1, 0) 
-        end
-        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then 
-            direction = direction + Vector3.new(0, -1, 0) 
-        end
-
-        if direction.Magnitude > 0 then 
-            direction = direction.Unit * Movement.Settings.flySpeed 
-        end
-        
-        Movement.Objects.bodyVelocity.Velocity = direction
-        Movement.Objects.bodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + camera.CFrame.LookVector)
+        if not camera then return end
+        local input = Liquidation.Services.UserInputService
+        local direction = input:GetFocusedTextBox() and Vector3.zero or humanoid.MoveDirection
+        local forward = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+        local vertical = 0
+        if forward.Magnitude > 0.01 then vertical = direction:Dot(forward.Unit) * camera.CFrame.LookVector.Y end
+        if input:IsKeyDown(Enum.KeyCode.Space) or humanoid.Jump then vertical += 1 end
+        if input:IsKeyDown(Enum.KeyCode.LeftControl) then vertical -= 1 end
+        direction = Vector3.new(direction.X, vertical, direction.Z)
+        if direction.Magnitude > 1 then direction = direction.Unit end
+        local requested = tonumber(Movement.Settings.flySpeed) or 50
+        if requested ~= requested then requested = 50 end
+        local speed = Liquidation.Motion:SafeSpeed(requested, character) * (Liquidation.Motion.FlyScale or 1)
+        local desired = direction * speed
+        desired = Vector3.new(desired.X, math.clamp(desired.Y, -18, 18), desired.Z)
+        dt = math.clamp(dt, 0, 0.1)
+        flyVelocity = flyVelocity:Lerp(desired, 1 - math.exp(-10 * dt))
+        root.AssemblyLinearVelocity = flyVelocity + Vector3.new(0, Liquidation.Services.Workspace.Gravity * dt, 0)
+        humanoid.AutoRotate = false
+        if forward.Magnitude > 0.01 then root.CFrame = CFrame.lookAt(root.Position, root.Position + forward.Unit) end
+        Liquidation.Motion.Goal, Liquidation.Motion.LastMovedAt = speed, os.clock()
     end)
 end
-
 local function disableFly()
-    if not Movement.States.FlyEnabled then return end
-    Movement.States.FlyEnabled = false
-    
-    if Movement.Objects.bodyVelocity then 
-        Movement.Objects.bodyVelocity:Destroy()
-        Movement.Objects.bodyVelocity = nil 
-    end
-    if Movement.Objects.bodyGyro then 
-        Movement.Objects.bodyGyro:Destroy()
-        Movement.Objects.bodyGyro = nil 
-    end
-    
-    local humanoid = Movement.GetHumanoid()
-    if humanoid then 
-        humanoid.PlatformStand = false 
-    end
-    
-    if Movement.Connections.flyLoop then
-        Movement.Connections.flyLoop:Disconnect()
-        Movement.Connections.flyLoop = nil
-    end
+    Movement.States.FlyEnabled, Liquidation.Motion.Fly = false, false
+    Liquidation.safeDisconnect(Movement.Connections.flyLoop)
+    Movement.Connections.flyLoop = nil
+    releaseFlyCharacter()
 end
-
--- FREE CAMERA --
 
 local function lockMouse()
     if not Movement.States.FreeCameraEnabled then return end
