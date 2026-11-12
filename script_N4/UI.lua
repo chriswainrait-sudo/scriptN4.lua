@@ -4252,21 +4252,13 @@ function NexusUI:CreateWindow(options)
         local tierShine = TweenService:Create(sh, TweenInfo.new(2.6, Enum.EasingStyle.Linear,
             Enum.EasingDirection.InOut, -1), {Offset = Vector2.new(1, 0)})
         tierShine:Play()
-        local tierGlow
-        if not isPremiumUser then
-            logoSubtitle.TextStrokeColor3 = Color3.fromRGB(194, 178, 255)
-            logoSubtitle.TextStrokeTransparency = 0.75
-            tierGlow = TweenService:Create(logoSubtitle, TweenInfo.new(1.8, Enum.EasingStyle.Sine,
-                Enum.EasingDirection.InOut, -1, true), {TextStrokeTransparency = 0.32})
-            tierGlow:Play()
-        end
+        logoSubtitle.TextStrokeTransparency = 1
 
         TrackGuiConnection(mainFrame:GetPropertyChangedSignal("Visible"):Connect(function()
             dock.Visible = mainFrame.Visible
         end))
         TrackGuiConnection(screenGui.Destroying:Connect(function()
             tierShine:Cancel()
-            if tierGlow then tierGlow:Cancel() end
         end))
     end
 
