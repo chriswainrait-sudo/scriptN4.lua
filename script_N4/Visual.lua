@@ -2,7 +2,7 @@
     ──◦ rwque ◦──
 ]]
 
-local Wisper = _G.Wisper
+local Liquidation = _G.Liquidation
 
 local Visual = {
     Connections = {},
@@ -272,7 +272,7 @@ function Visual.GetAllGifts()
 end
 
 function Visual.FindChristmasTree()
-    local map = Wisper.Services.Workspace:FindFirstChild("Map")
+    local map = Liquidation.Services.Workspace:FindFirstChild("Map")
     if not map then return nil end
     
     local christmasTree = map:FindFirstChild("chris")
@@ -292,7 +292,7 @@ function Visual.FindChristmasTree()
         end
     end
     
-    for _, obj in ipairs(Wisper.Services.Workspace:GetDescendants()) do
+    for _, obj in ipairs(Liquidation.Services.Workspace:GetDescendants()) do
         if obj.Name == "TreePine" then
             return obj
         end
@@ -302,7 +302,7 @@ function Visual.FindChristmasTree()
 end
 
 function Visual.TeleportToObject(obj)
-    local localPlayer = Wisper.Player
+    local localPlayer = Liquidation.Player
     if not localPlayer or not localPlayer.Character then
         return false
     end
@@ -451,13 +451,13 @@ end
 function Visual.TrackObjects()
     Visual.ESP.trackedObjects = {}
     
-    for _, obj in ipairs(Wisper.Services.Workspace:GetDescendants()) do
+    for _, obj in ipairs(Liquidation.Services.Workspace:GetDescendants()) do
         if obj:IsA("Model") then
             Visual.AddObjectToTrack(obj)
         end
     end
     
-    Visual.ESP.espConnections.descendantAdded = Wisper.Services.Workspace.DescendantAdded:Connect(function(obj)
+    Visual.ESP.espConnections.descendantAdded = Liquidation.Services.Workspace.DescendantAdded:Connect(function(obj)
         if obj:IsA("Model") then
             Visual.AddObjectToTrack(obj)
         end
@@ -470,8 +470,8 @@ function Visual.UpdateESP(force)
     Visual.ESP.lastUpdate = currentTime
     
     -- Update players
-    for _, targetPlayer in ipairs(Wisper.Services.Players:GetPlayers()) do
-        if targetPlayer ~= Wisper.Player and targetPlayer.Character then
+    for _, targetPlayer in ipairs(Liquidation.Services.Players:GetPlayers()) do
+        if targetPlayer ~= Liquidation.Player and targetPlayer.Character then
             local hrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local role = Visual.GetRole(targetPlayer)
@@ -530,13 +530,13 @@ function Visual.StopESP()
     Visual.ClearAllESP()
     
     for _, connection in pairs(Visual.ESP.espConnections) do
-        Wisper.safeDisconnect(connection)
+        Liquidation.safeDisconnect(connection)
     end
     Visual.ESP.espConnections = {}
 end
 
 function Visual.ClearAllESP()
-    for _, targetPlayer in ipairs(Wisper.Services.Players:GetPlayers()) do
+    for _, targetPlayer in ipairs(Liquidation.Services.Players:GetPlayers()) do
         if targetPlayer.Character then
             Visual.ClearHighlight(targetPlayer.Character)
             Visual.ClearLabel(targetPlayer.Character)
@@ -767,7 +767,7 @@ function Visual.CreateAdvancedESP(plr)
 end
 
 function Visual.SetupPlayerAdvancedESP(plr)
-    if plr == Wisper.Player then return end
+    if plr == Liquidation.Player then return end
     
     Visual.CreateAdvancedESP(plr)
     
@@ -836,7 +836,7 @@ function Visual.UpdateAdvancedESP()
     local settings = Visual.AdvancedESP.settings
     if not settings.enabled then return end
     
-    local Camera = Wisper.Camera
+    local Camera = Liquidation.Camera
     local camPos = Camera.CFrame.Position
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
     
@@ -1036,13 +1036,13 @@ function Visual.StartAdvancedESP()
         Visual.AdvancedESP.connections.renderStepped = nil
     end
     
-    Visual.AdvancedESP.connections.playerAdded = Wisper.Services.Players.PlayerAdded:Connect(function(plr)
-        if plr ~= Wisper.Player then
+    Visual.AdvancedESP.connections.playerAdded = Liquidation.Services.Players.PlayerAdded:Connect(function(plr)
+        if plr ~= Liquidation.Player then
             Visual.SetupPlayerAdvancedESP(plr)
         end
     end)
     
-    Visual.AdvancedESP.connections.playerRemoving = Wisper.Services.Players.PlayerRemoving:Connect(function(plr)
+    Visual.AdvancedESP.connections.playerRemoving = Liquidation.Services.Players.PlayerRemoving:Connect(function(plr)
         Visual.HideAdvancedESP(plr)
         if Visual.AdvancedESP.playerConnections[plr] then
             for _, conn in pairs(Visual.AdvancedESP.playerConnections[plr]) do
@@ -1052,13 +1052,13 @@ function Visual.StartAdvancedESP()
         end
     end)
     
-    for _, plr in pairs(Wisper.Services.Players:GetPlayers()) do
-        if plr ~= Wisper.Player then
+    for _, plr in pairs(Liquidation.Services.Players:GetPlayers()) do
+        if plr ~= Liquidation.Player then
             Visual.SetupPlayerAdvancedESP(plr)
         end
     end
     
-    Visual.AdvancedESP.connections.renderStepped = Wisper.Services.RunService.RenderStepped:Connect(function()
+    Visual.AdvancedESP.connections.renderStepped = Liquidation.Services.RunService.RenderStepped:Connect(function()
         Visual.UpdateAdvancedESP()
     end)
 end
@@ -1084,19 +1084,19 @@ end
 function Visual.ToggleNoShadow(enabled)
     Visual.Effects.noShadowEnabled = enabled
     if enabled then
-        for _, light in ipairs(Wisper.Services.Lighting:GetDescendants()) do 
+        for _, light in ipairs(Liquidation.Services.Lighting:GetDescendants()) do 
             if light:IsA("Light") then 
                 light.Shadows = false 
             end 
         end
-        Wisper.Services.Lighting.GlobalShadows = false
+        Liquidation.Services.Lighting.GlobalShadows = false
     else
-        for _, light in ipairs(Wisper.Services.Lighting:GetDescendants()) do 
+        for _, light in ipairs(Liquidation.Services.Lighting:GetDescendants()) do 
             if light:IsA("Light") then 
                 light.Shadows = true 
             end 
         end
-        Wisper.Services.Lighting.GlobalShadows = true
+        Liquidation.Services.Lighting.GlobalShadows = true
     end
 end
 
@@ -1105,7 +1105,7 @@ function Visual.ToggleNoFog(enabled)
     
     if enabled then
         pcall(function()
-            local lighting = Wisper.Services.Lighting
+            local lighting = Liquidation.Services.Lighting
             
             for _, effect in ipairs(lighting:GetChildren()) do
                 if effect:IsA("Atmosphere") or 
@@ -1117,7 +1117,7 @@ function Visual.ToggleNoFog(enabled)
                 end
             end
             
-            local map = Wisper.Services.Workspace:FindFirstChild("Map")
+            local map = Liquidation.Services.Workspace:FindFirstChild("Map")
             if map then
                 for _, obj in ipairs(map:GetDescendants()) do
                     if obj:IsA("Atmosphere") or 
@@ -1139,7 +1139,7 @@ function Visual.ToggleNoFog(enabled)
                 Visual.ESP.espConnections.noFog:Disconnect()
             end
             
-            Visual.ESP.espConnections.noFog = Wisper.Services.RunService.Heartbeat:Connect(function()
+            Visual.ESP.espConnections.noFog = Liquidation.Services.RunService.Heartbeat:Connect(function()
                 if Visual.Effects.noFogEnabled then
                     lighting.FogEnd = 10000000
                     lighting.FogStart = 0
@@ -1157,17 +1157,17 @@ end
 
 function Visual.ToggleFullBright(enabled)
     Visual.Effects.fullbrightEnabled = enabled
-    Wisper.States.fullbrightEnabled = enabled
+    Liquidation.States.fullbrightEnabled = enabled
     
     if enabled then
-        Wisper.Services.Lighting.GlobalShadows = false
-        Wisper.Services.Lighting.FogEnd = 100000
-        Wisper.Services.Lighting.Brightness = 2
-        Wisper.Services.Lighting.ClockTime = 14
+        Liquidation.Services.Lighting.GlobalShadows = false
+        Liquidation.Services.Lighting.FogEnd = 100000
+        Liquidation.Services.Lighting.Brightness = 2
+        Liquidation.Services.Lighting.ClockTime = 14
     else
-        Wisper.Services.Lighting.GlobalShadows = true
-        Wisper.Services.Lighting.FogEnd = 1000
-        Wisper.Services.Lighting.Brightness = 1
+        Liquidation.Services.Lighting.GlobalShadows = true
+        Liquidation.Services.Lighting.FogEnd = 1000
+        Liquidation.Services.Lighting.Brightness = 1
     end
 end
 
@@ -1176,12 +1176,12 @@ function Visual.ToggleTimeChanger(enabled)
 
     if enabled then
         if not Visual.Effects.originalClockTime then
-            Visual.Effects.originalClockTime = Wisper.Services.Lighting.ClockTime;
+            Visual.Effects.originalClockTime = Liquidation.Services.Lighting.ClockTime;
         end;
-        Wisper.Services.Lighting.ClockTime = Visual.Effects.currentTimeValue or 14;
+        Liquidation.Services.Lighting.ClockTime = Visual.Effects.currentTimeValue or 14;
     else
         if Visual.Effects.originalClockTime then
-            Wisper.Services.Lighting.ClockTime = Visual.Effects.originalClockTime;
+            Liquidation.Services.Lighting.ClockTime = Visual.Effects.originalClockTime;
         end;
     end;
 end;
@@ -1189,7 +1189,7 @@ end;
 function Visual.SetTime(TimeVal)
     Visual.Effects.currentTimeValue = TimeVal;
     if Visual.Effects.timeChangerEnabled then
-        Wisper.Services.Lighting.ClockTime = TimeVal;
+        Liquidation.Services.Lighting.ClockTime = TimeVal;
     end;
 end;
 

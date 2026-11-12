@@ -1,4 +1,4 @@
-local Wisper = _G.Wisper
+local Liquidation = _G.Liquidation
 
 local Killer = {
     Connections = {},
@@ -8,7 +8,7 @@ local Killer = {
 }
 
 local function isKillerTeam()
-    local player = Wisper.Player
+    local player = Liquidation.Player
     if not player then return false end
     
     local team = player.Team
@@ -19,14 +19,14 @@ local function isKillerTeam()
 end
 
 local function setupTeamListener(callback)
-    local teamChangedConn = Wisper.Player:GetPropertyChangedSignal("Team"):Connect(callback)
+    local teamChangedConn = Liquidation.Player:GetPropertyChangedSignal("Team"):Connect(callback)
     
     local function onCharacterAdded(character)
         task.wait(0.5)
         callback()
     end
     
-    local charAddedConn = Wisper.Player.CharacterAdded:Connect(onCharacterAdded)
+    local charAddedConn = Liquidation.Player.CharacterAdded:Connect(onCharacterAdded)
     
     task.spawn(callback)
     
@@ -42,7 +42,7 @@ local UseFakeSaw = (function()
     
     local function getMaskedAlexAttackRemote()
         local success, result = pcall(function()
-            return Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Masked"):WaitForChild("alexattack")
+            return Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Masked"):WaitForChild("alexattack")
         end)
         return success and result or nil
     end
@@ -66,7 +66,7 @@ local UseFakeSaw = (function()
                 connection:Disconnect()
             end
             
-            connection = Wisper.Services.RunService.Heartbeat:Connect(function()
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(function()
                 if enabled and isKillerTeam() then
                     executeFakeSaw()
                     task.wait(35)
@@ -88,15 +88,15 @@ local UseFakeSaw = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.UseFakeSawEnabled = true
+        Liquidation.States.UseFakeSawEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -110,7 +110,7 @@ local UseFakeSaw = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.UseFakeSawEnabled = false
+        Liquidation.States.UseFakeSawEnabled = false
         
         if connection then
             connection:Disconnect()
@@ -120,10 +120,10 @@ local UseFakeSaw = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -157,7 +157,7 @@ local SpearCrosshair = (function()
         screenGui.Name = "SpearCrosshair"
         screenGui.ResetOnSpawn = false
         screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-        screenGui.Parent = Wisper.Player:WaitForChild("PlayerGui")
+        screenGui.Parent = Liquidation.Player:WaitForChild("PlayerGui")
 
         crosshairFrame = Instance.new("Frame")
         crosshairFrame.Name = "CrosshairFrame"
@@ -196,7 +196,7 @@ local SpearCrosshair = (function()
     local function updateCrosshairVisibility()
         if not crosshairFrame then return end
         
-        local character = Wisper.Player.Character
+        local character = Liquidation.Player.Character
         local shouldShow = false
         
         if enabled and isKillerTeam() and character then
@@ -214,7 +214,7 @@ local SpearCrosshair = (function()
         end
         
         if enabled and isKillerTeam() then
-            local character = Wisper.Player.Character
+            local character = Liquidation.Player.Character
             if character then
                 attributeListener = character:GetAttributeChangedSignal("spearmode"):Connect(function()
                     updateCrosshairVisibility()
@@ -235,13 +235,13 @@ local SpearCrosshair = (function()
             
             setupAttributeListener()
             
-            local charAddedConn = Wisper.Player.CharacterAdded:Connect(onCharacterAdded)
+            local charAddedConn = Liquidation.Player.CharacterAdded:Connect(onCharacterAdded)
             table.insert(teamListeners, charAddedConn)
             
             if renderConnection then
                 renderConnection:Disconnect()
             end
-            renderConnection = Wisper.Services.RunService.RenderStepped:Connect(function()
+            renderConnection = Liquidation.Services.RunService.RenderStepped:Connect(function()
                 if crosshairFrame then
                             
                     crosshairFrame.Position = UDim2.new(0.5, -20, 0.5, -20)
@@ -278,15 +278,15 @@ local SpearCrosshair = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.SpearCrosshairEnabled = true
+        Liquidation.States.SpearCrosshairEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -300,7 +300,7 @@ local SpearCrosshair = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.SpearCrosshairEnabled = false
+        Liquidation.States.SpearCrosshairEnabled = false
         
         destroyCrosshair()
         
@@ -317,10 +317,10 @@ local SpearCrosshair = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -344,7 +344,7 @@ local DoubleTap = (function()
     
     local function GetBasicAttackRemote()
         local success, result = pcall(function()
-            return Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Attacks"):WaitForChild("BasicAttack")
+            return Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Attacks"):WaitForChild("BasicAttack")
         end)
         return success and result or nil
     end
@@ -433,15 +433,15 @@ local DoubleTap = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.DoubleTapEnabled = true
+        Liquidation.States.DoubleTapEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -455,17 +455,17 @@ local DoubleTap = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.DoubleTapEnabled = false
+        Liquidation.States.DoubleTapEnabled = false
         
         removeHook()
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -492,9 +492,9 @@ local DestroyPallets = (function()
             return
         end
         
-        local DestroyGlobal = Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Pallet"):WaitForChild("Jason"):WaitForChild("Destroy-Global")
+        local DestroyGlobal = Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Pallet"):WaitForChild("Jason"):WaitForChild("Destroy-Global")
         
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         local savedPosition = nil
         
         if character and character:FindFirstChild("HumanoidRootPart") then
@@ -504,7 +504,7 @@ local DestroyPallets = (function()
         destroyed = true
         
         local palletsFound = 0
-        for _, obj in ipairs(Wisper.Services.Workspace:GetDescendants()) do
+        for _, obj in ipairs(Liquidation.Services.Workspace:GetDescendants()) do
             if obj.Name:find("PalletPoint") then
                 palletsFound = palletsFound + 1
                 DestroyGlobal:FireServer(obj)
@@ -538,14 +538,14 @@ local DestroyPallets = (function()
                 mapCheckConnection:Disconnect()
             end
             
-            mapCheckConnection = Wisper.Services.Workspace.DescendantAdded:Connect(function(obj)
+            mapCheckConnection = Liquidation.Services.Workspace.DescendantAdded:Connect(function(obj)
                 if obj.Name:find("PalletPoint") then
                     task.wait(0.1)
                     resetPalletsState()
                 end
             end)
             
-            connection = Wisper.Services.RunService.Heartbeat:Connect(function()
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(function()
                 if enabled then
                     destroyAllPallets()
                 end
@@ -566,15 +566,15 @@ local DestroyPallets = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.DestroyPalletsEnabled = true
+        Liquidation.States.DestroyPalletsEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -586,7 +586,7 @@ local DestroyPallets = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.DestroyPalletsEnabled = false
+        Liquidation.States.DestroyPalletsEnabled = false
         
         if connection then
             connection:Disconnect()
@@ -603,10 +603,10 @@ local DestroyPallets = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -629,7 +629,7 @@ local NoSlowdown = (function()
     local teamListeners = {}
 
     local function saveOriginalSpeed()
-        local humanoid = Wisper.getHumanoid()
+        local humanoid = Liquidation.getHumanoid()
         if humanoid then
             originalSpeed = humanoid.WalkSpeed
             speedLocked = false
@@ -637,7 +637,7 @@ local NoSlowdown = (function()
     end
     
     local function restoreOriginalSpeed()
-        local humanoid = Wisper.getHumanoid()
+        local humanoid = Liquidation.getHumanoid()
         if humanoid and originalSpeed then
             humanoid.WalkSpeed = originalSpeed
         end
@@ -653,13 +653,13 @@ local NoSlowdown = (function()
         if enabled and isKillerTeam() then
             saveOriginalSpeed()
             
-            slowdownConnection = Wisper.Services.RunService.Heartbeat:Connect(function()
+            slowdownConnection = Liquidation.Services.RunService.Heartbeat:Connect(function()
                 if not enabled or not isKillerTeam() then return end
                 
-                local char = Wisper.getCharacter()
+                local char = Liquidation.getCharacter()
                 if not char then return end
                 
-                local hum = Wisper.getHumanoid()
+                local hum = Liquidation.getHumanoid()
                 if not hum then return end
                 
                 if hum.WalkSpeed < 16 then
@@ -675,7 +675,7 @@ local NoSlowdown = (function()
             end)
             
             local charAddedConnection
-            charAddedConnection = Wisper.Player.CharacterAdded:Connect(function(newChar)
+            charAddedConnection = Liquidation.Player.CharacterAdded:Connect(function(newChar)
                 if enabled and isKillerTeam() then
                     if slowdownConnection then
                         slowdownConnection:Disconnect()
@@ -705,15 +705,15 @@ local NoSlowdown = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.NoSlowdownEnabled = true
+        Liquidation.States.NoSlowdownEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -727,10 +727,10 @@ local NoSlowdown = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.NoSlowdownEnabled = false
+        Liquidation.States.NoSlowdownEnabled = false
         
         if slowdownConnection then
-            Wisper.safeDisconnect(slowdownConnection)
+            Liquidation.safeDisconnect(slowdownConnection)
             slowdownConnection = nil
         end
         
@@ -739,10 +739,10 @@ local NoSlowdown = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -789,8 +789,8 @@ local Hitbox = (function()
             return
         end
         
-        for _, player in ipairs(Wisper.Services.Players:GetPlayers()) do
-            if player ~= Wisper.Player then
+        for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
+            if player ~= Liquidation.Player then
                 local char = player.Character
                 if char then
                     local root = char:FindFirstChild("HumanoidRootPart")
@@ -820,7 +820,7 @@ local Hitbox = (function()
     local function updateHitboxState()
         if enabled and isKillerTeam() then
             if not Killer.Connections.Hitbox then
-                Killer.Connections.Hitbox = Wisper.Services.RunService.Heartbeat:Connect(UpdateHitboxes)
+                Killer.Connections.Hitbox = Liquidation.Services.RunService.Heartbeat:Connect(UpdateHitboxes)
             end
         elseif enabled then
             UpdateHitboxes()
@@ -840,15 +840,15 @@ local Hitbox = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.HitboxEnabled = true
+        Liquidation.States.HitboxEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -862,7 +862,7 @@ local Hitbox = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.HitboxEnabled = false
+        Liquidation.States.HitboxEnabled = false
         
         if Killer.Connections.Hitbox then
             Killer.Connections.Hitbox:Disconnect()
@@ -874,10 +874,10 @@ local Hitbox = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -933,7 +933,7 @@ local BreakGenerator = (function()
     end
 
     local function FindNearestGenerator(maxDistance)
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         if not character then return nil end
         
         local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
@@ -943,7 +943,7 @@ local BreakGenerator = (function()
         local nearestGenerator = nil
         local nearestDistance = math.huge
         
-        for _, obj in ipairs(Wisper.Services.Workspace:GetDescendants()) do
+        for _, obj in ipairs(Liquidation.Services.Workspace:GetDescendants()) do
             if obj.Name == "Generator" then
                 local hitBox = obj:FindFirstChild("HitBox")
                 if hitBox then
@@ -968,7 +968,7 @@ local BreakGenerator = (function()
         local progress = getGeneratorProgress(nearestGenerator)
         if progress <= 0 then return false end
         
-        local BreakGenEvent = Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Generator"):WaitForChild("BreakGenEvent")
+        local BreakGenEvent = Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Generator"):WaitForChild("BreakGenEvent")
         local hitBox = nearestGenerator:FindFirstChild("HitBox")
         
         if hitBox then
@@ -983,7 +983,7 @@ local BreakGenerator = (function()
         if spamInProgress then return end
         
         if not isKillerTeam() then return end
-        if not Wisper.Player.Character then return end
+        if not Liquidation.Player.Character then return end
         
         local nearestGenerator = FindNearestGenerator(10)
         if not nearestGenerator then return end
@@ -992,13 +992,13 @@ local BreakGenerator = (function()
         local spamCount = 0
         
         local connection
-        connection = Wisper.Services.RunService.Heartbeat:Connect(function()
+        connection = Liquidation.Services.RunService.Heartbeat:Connect(function()
             if not spamInProgress then
                 if connection then connection:Disconnect() end
                 return
             end
             
-            if not isKillerTeam() or not Wisper.Player.Character then
+            if not isKillerTeam() or not Liquidation.Player.Character then
                 spamInProgress = false
                 if connection then connection:Disconnect() end
                 return
@@ -1020,7 +1020,7 @@ local BreakGenerator = (function()
             
             local hitBox = currentGenerator:FindFirstChild("HitBox")
             if hitBox then
-                local BreakGenEvent = Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Generator"):WaitForChild("BreakGenEvent")
+                local BreakGenEvent = Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Generator"):WaitForChild("BreakGenEvent")
                 BreakGenEvent:FireServer(hitBox, 0, true)
                 spamCount = spamCount + 1
                 
@@ -1037,7 +1037,7 @@ local BreakGenerator = (function()
         end)
         
         local stopConnection
-        stopConnection = Wisper.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        stopConnection = Liquidation.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if not gameProcessed and input.KeyCode == Enum.KeyCode.Space then
                 if spamInProgress then
                     spamInProgress = false
@@ -1054,15 +1054,15 @@ local BreakGenerator = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.BreakGeneratorEnabled = true
+        Liquidation.States.BreakGeneratorEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1076,17 +1076,17 @@ local BreakGenerator = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.BreakGeneratorEnabled = false
+        Liquidation.States.BreakGeneratorEnabled = false
         
         spamInProgress = false
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1111,7 +1111,7 @@ local ThirdPerson = (function()
     local teamListeners = {}
 
     local function UpdateThirdPerson()
-        local cam = Wisper.Services.Workspace.CurrentCamera
+        local cam = Liquidation.Services.Workspace.CurrentCamera
         if not cam then return end
         local shouldBeActive = enabled and isKillerTeam()
         
@@ -1120,9 +1120,9 @@ local ThirdPerson = (function()
                 originalCameraType = cam.CameraType
             end
             cam.CameraType = Enum.CameraType.Custom
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then
-                local hum = Wisper.getHumanoid()
+                local hum = Liquidation.getHumanoid()
                 if hum then hum.CameraOffset = offset end
             end
             thirdPersonWasActive = true
@@ -1131,9 +1131,9 @@ local ThirdPerson = (function()
                 cam.CameraType = originalCameraType
                 originalCameraType = nil
             end
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then
-                local hum = Wisper.getHumanoid()
+                local hum = Liquidation.getHumanoid()
                 if hum then hum.CameraOffset = Vector3.new(0, 0, 0) end
             end
             thirdPersonWasActive = false
@@ -1143,7 +1143,7 @@ local ThirdPerson = (function()
     local function updateThirdPersonState()
         if enabled and isKillerTeam() then
             if not Killer.Connections.ThirdPerson then
-                Killer.Connections.ThirdPerson = Wisper.Services.RunService.Heartbeat:Connect(UpdateThirdPerson)
+                Killer.Connections.ThirdPerson = Liquidation.Services.RunService.Heartbeat:Connect(UpdateThirdPerson)
             end
         elseif enabled then
             if Killer.Connections.ThirdPerson then
@@ -1152,15 +1152,15 @@ local ThirdPerson = (function()
             end
             
             task.wait(0.1)
-            local cam = Wisper.Services.Workspace.CurrentCamera
+            local cam = Liquidation.Services.Workspace.CurrentCamera
             if cam and originalCameraType then
                 cam.CameraType = originalCameraType
                 originalCameraType = nil
             end
             
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then
-                local hum = Wisper.getHumanoid()
+                local hum = Liquidation.getHumanoid()
                 if hum then 
                     hum.CameraOffset = Vector3.new(0, 0, 0)
                 end
@@ -1173,15 +1173,15 @@ local ThirdPerson = (function()
             end
             
             task.wait(0.1)
-            local cam = Wisper.Services.Workspace.CurrentCamera
+            local cam = Liquidation.Services.Workspace.CurrentCamera
             if cam and originalCameraType then
                 cam.CameraType = originalCameraType
                 originalCameraType = nil
             end
             
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then
-                local hum = Wisper.getHumanoid()
+                local hum = Liquidation.getHumanoid()
                 if hum then 
                     hum.CameraOffset = Vector3.new(0, 0, 0)
                 end
@@ -1193,15 +1193,15 @@ local ThirdPerson = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.ThirdPersonEnabled = true
+        Liquidation.States.ThirdPersonEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1215,7 +1215,7 @@ local ThirdPerson = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.ThirdPersonEnabled = false
+        Liquidation.States.ThirdPersonEnabled = false
         
         if Killer.Connections.ThirdPerson then
             Killer.Connections.ThirdPerson:Disconnect()
@@ -1224,15 +1224,15 @@ local ThirdPerson = (function()
         
         task.wait(0.1)
         
-        local cam = Wisper.Services.Workspace.CurrentCamera
+        local cam = Liquidation.Services.Workspace.CurrentCamera
         if cam and originalCameraType then
             cam.CameraType = originalCameraType
             originalCameraType = nil
         end
         
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then
-            local hum = Wisper.getHumanoid()
+            local hum = Liquidation.getHumanoid()
             if hum then 
                 hum.CameraOffset = Vector3.new(0, 0, 0)
             end
@@ -1242,10 +1242,10 @@ local ThirdPerson = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1335,7 +1335,7 @@ local BeatGameKiller = (function()
             return 
         end
         
-        local root = Wisper.getRootPart()
+        local root = Liquidation.getRootPart()
         if not root then return end
         
         local needNewTarget = true
@@ -1358,8 +1358,8 @@ local BeatGameKiller = (function()
         if needNewTarget then
             local survivors = {}
             
-            for _, player in ipairs(Wisper.Services.Players:GetPlayers()) do
-                if player ~= Wisper.Player and IsSurvivor(player) and player.Character then
+            for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
+                if player ~= Liquidation.Player and IsSurvivor(player) and player.Character then
                     local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
                     local pHum = player.Character:FindFirstChildOfClass("Humanoid")
                     
@@ -1405,7 +1405,7 @@ local BeatGameKiller = (function()
             return
         end
         
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then
             for _, part in ipairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide = false end
@@ -1422,7 +1422,7 @@ local BeatGameKiller = (function()
         root.CFrame = CFrame.new(offsetPos, targetPos)
         
         pcall(function()
-            local remotes = Wisper.Services.ReplicatedStorage:FindFirstChild("Remotes")
+            local remotes = Liquidation.Services.ReplicatedStorage:FindFirstChild("Remotes")
             if remotes then
                 local attacks = remotes:FindFirstChild("Attacks")
                 if attacks then
@@ -1438,7 +1438,7 @@ local BeatGameKiller = (function()
     local function updateBeatGameState()
         if enabled and isKillerTeam() then
             if not Killer.Connections.BeatGame then
-                Killer.Connections.BeatGame = Wisper.Services.RunService.Heartbeat:Connect(UpdateBeatGame)
+                Killer.Connections.BeatGame = Liquidation.Services.RunService.Heartbeat:Connect(UpdateBeatGame)
             end
         elseif enabled then
             if Killer.Connections.BeatGame then
@@ -1458,15 +1458,15 @@ local BeatGameKiller = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.BeatGameKillerEnabled = true
+        Liquidation.States.BeatGameKillerEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1480,7 +1480,7 @@ local BeatGameKiller = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.BeatGameKillerEnabled = false
+        Liquidation.States.BeatGameKillerEnabled = false
         
         if Killer.Connections.BeatGame then
             Killer.Connections.BeatGame:Disconnect()
@@ -1492,10 +1492,10 @@ local BeatGameKiller = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1527,7 +1527,7 @@ local AbysswalkerCorrupt = (function()
         end
         
         local success = pcall(function()
-            local CorruptRemote = Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Abysswalker"):WaitForChild("corrupt")
+            local CorruptRemote = Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Abysswalker"):WaitForChild("corrupt")
             CorruptRemote:FireServer()
         end)
     end
@@ -1539,7 +1539,7 @@ local AbysswalkerCorrupt = (function()
         end
         
         if enabled then
-            inputConnection = Wisper.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            inputConnection = Liquidation.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 if gameProcessed or not canActivate() then return end
                 
                 if input.KeyCode == Enum.KeyCode.Q then
@@ -1571,15 +1571,15 @@ local AbysswalkerCorrupt = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.AbysswalkerCorruptEnabled = true
+        Liquidation.States.AbysswalkerCorruptEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1594,7 +1594,7 @@ local AbysswalkerCorrupt = (function()
         if not enabled then return end
         enabled = false
         keybindEnabled = false
-        Wisper.States.AbysswalkerCorruptEnabled = false
+        Liquidation.States.AbysswalkerCorruptEnabled = false
         
         if inputConnection then
             inputConnection:Disconnect()
@@ -1604,10 +1604,10 @@ local AbysswalkerCorrupt = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1640,7 +1640,7 @@ local AntiBlind = (function()
     
     local function findBlindRemotes()
         local remotes = {}
-        local ReplicatedStorage = Wisper.Services.ReplicatedStorage
+        local ReplicatedStorage = Liquidation.Services.ReplicatedStorage
         
         local function searchInFolder(folder)
             if not folder then return end
@@ -1742,7 +1742,7 @@ local AntiBlind = (function()
     local function updateAntiBlind()
         if enabled and isKillerTeam() then
             isAntiBlindEnabled = true
-            Wisper.States.KillerAntiBlindEnabled = true
+            Liquidation.States.KillerAntiBlindEnabled = true
             
             if not setupHook() then
                 task.spawn(function()
@@ -1757,12 +1757,12 @@ local AntiBlind = (function()
             
         elseif enabled then
             isAntiBlindEnabled = false
-            Wisper.States.KillerAntiBlindEnabled = false
+            Liquidation.States.KillerAntiBlindEnabled = false
             removeHook()
             
         else
             isAntiBlindEnabled = false
-            Wisper.States.KillerAntiBlindEnabled = false
+            Liquidation.States.KillerAntiBlindEnabled = false
             removeHook()
         end
     end
@@ -1774,10 +1774,10 @@ local AntiBlind = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1793,17 +1793,17 @@ local AntiBlind = (function()
         enabled = false
         
         isAntiBlindEnabled = false
-        Wisper.States.KillerAntiBlindEnabled = false
+        Liquidation.States.KillerAntiBlindEnabled = false
         
         removeHook()
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1832,14 +1832,14 @@ local NoPalletStun = (function()
         end
         
         local success1, result1 = pcall(function()
-            return Wisper.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
+            return Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
                 :WaitForChild("Pallet", 5)
                 :WaitForChild("Jason", 5)
                 :WaitForChild("Stun", 5)
         end)
         
         local success2, result2 = pcall(function()
-            return Wisper.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
+            return Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
                 :WaitForChild("Pallet", 5)
                 :WaitForChild("Jason", 5)
                 :WaitForChild("Stunover", 5)
@@ -1948,15 +1948,15 @@ local NoPalletStun = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.NoPalletStunEnabled = true
+        Liquidation.States.NoPalletStunEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1970,17 +1970,17 @@ local NoPalletStun = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.NoPalletStunEnabled = false
+        Liquidation.States.NoPalletStunEnabled = false
         
         removeHook()
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2015,8 +2015,8 @@ local SpearAimBot = (function()
         local closestDistance = math.huge
         local myPos = workspace.CurrentCamera.CFrame.Position
         
-        for _, player in pairs(Wisper.Services.Players:GetPlayers()) do
-            if player ~= Wisper.Player and player.Character then
+        for _, player in pairs(Liquidation.Services.Players:GetPlayers()) do
+            if player ~= Liquidation.Player and player.Character then
                 local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
                 local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
                 if humanoid and humanoid.Health > 0 and rootPart then
@@ -2033,7 +2033,7 @@ local SpearAimBot = (function()
     
     local function getSpearRemote()
         local success, result = pcall(function()
-            return Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Veil"):WaitForChild("Spearthrow")
+            return Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Veil"):WaitForChild("Spearthrow")
         end)
         return success and result or nil
     end
@@ -2091,15 +2091,15 @@ local SpearAimBot = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.SpearAimbotEnabled = true
+        Liquidation.States.SpearAimbotEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -2113,17 +2113,17 @@ local SpearAimBot = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.SpearAimbotEnabled = false
+        Liquidation.States.SpearAimbotEnabled = false
         
         removeHook()
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2148,7 +2148,7 @@ local function activateMaskPower(maskName)
             return false
         end
         
-        local remotes = Wisper.Services.ReplicatedStorage:WaitForChild("Remotes")
+        local remotes = Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes")
         local killers = remotes:WaitForChild("Killers")
         local masked = killers:WaitForChild("Masked")
         local activatePower = masked:WaitForChild("Activatepower")
@@ -2163,10 +2163,10 @@ end
 -- TOGGLE FUNCTIONS --
 
 function Killer.Init(nxs)
-    Wisper = nxs
+    Liquidation = nxs
     
-    local Tabs = Wisper.Tabs
-    local Options = Wisper.Options
+    local Tabs = Liquidation.Tabs
+    local Options = Liquidation.Options
     
     local SpearCrosshairToggle = Tabs.Killer:AddToggle("SpearCrosshair", {
         Title = "Spear Crosshair (Veil)", 
@@ -2175,7 +2175,7 @@ function Killer.Init(nxs)
     })
 
     SpearCrosshairToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 SpearCrosshair.Enable() 
             else 
@@ -2191,7 +2191,7 @@ function Killer.Init(nxs)
     })
 
     DestroyPalletsToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 DestroyPallets.Enable() 
             else 
@@ -2207,7 +2207,7 @@ function Killer.Init(nxs)
     })
 
     NoSlowdownToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 NoSlowdown.Enable() 
             else 
@@ -2223,7 +2223,7 @@ function Killer.Init(nxs)
     })
 
     HitboxToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 Hitbox.Enable() 
             else 
@@ -2240,7 +2240,7 @@ function Killer.Init(nxs)
         Max = 500,
         Rounding = 1,
         Callback = function(value)
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 Hitbox.SetSize(value)
             end)
         end
@@ -2253,7 +2253,7 @@ function Killer.Init(nxs)
     })
 
     BreakGeneratorToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 BreakGenerator.Enable() 
             else 
@@ -2269,7 +2269,7 @@ function Killer.Init(nxs)
     })
 
     ThirdPersonToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 ThirdPerson.Enable() 
             else 
@@ -2285,7 +2285,7 @@ function Killer.Init(nxs)
     })
 
     NoPalletStunToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 NoPalletStun.Enable() 
             else 
@@ -2301,7 +2301,7 @@ function Killer.Init(nxs)
     })
 
     DoubleTapToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 DoubleTap.Enable() 
             else 
@@ -2317,7 +2317,7 @@ function Killer.Init(nxs)
     })
 
     BeatGameToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 BeatGameKiller.Enable() 
             else 
@@ -2333,7 +2333,7 @@ function Killer.Init(nxs)
     })
 
     UseFakeSawToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 UseFakeSaw.Enable() 
             else 
@@ -2349,7 +2349,7 @@ function Killer.Init(nxs)
     })
 
     AbysswalkerCorruptToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 AbysswalkerCorrupt.Enable() 
             else 
@@ -2365,7 +2365,7 @@ function Killer.Init(nxs)
     })
 
     AntiBlindToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 AntiBlind.Enable() 
             else 
@@ -2381,7 +2381,7 @@ function Killer.Init(nxs)
     })
 
     SpearAimbotToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then
                 SpearAimBot.Enable()
             else
@@ -2399,7 +2399,7 @@ function Killer.Init(nxs)
     })
 
     MaskPowers:OnChanged(function(value)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if value and value ~= "" then
                 activateMaskPower(value)
             end
@@ -2411,9 +2411,9 @@ function Killer.Init(nxs)
         Content = "Alex - Chainsaw\nTony - Fists\nBrandon - Speed\nJake - Long lunge\nRichter - Stealth\nGraham - Faster vaults\nRichard - Default mask"
     })
 
-    Wisper.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    Liquidation.Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if not gameProcessed and input.KeyCode == Enum.KeyCode.Space then
-            if Wisper.States.BreakGeneratorEnabled then
+            if Liquidation.States.BreakGeneratorEnabled then
                 BreakGenerator.SpamGeneratorBreak()
             end
         end
@@ -2437,7 +2437,7 @@ function Killer.Cleanup()
     SpearAimBot.Disable()
     
     for key, connection in pairs(Killer.Connections) do
-        Wisper.safeDisconnect(connection)
+        Liquidation.safeDisconnect(connection)
     end
     Killer.Connections = {}
     

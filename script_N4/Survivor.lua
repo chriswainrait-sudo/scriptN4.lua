@@ -1,4 +1,4 @@
-local Wisper = _G.Wisper
+local Liquidation = _G.Liquidation
 
 local Survivor = {
     Connections = {},
@@ -6,7 +6,7 @@ local Survivor = {
 }
 
 local function isSurvivorTeam()
-    local player = Wisper.Player
+    local player = Liquidation.Player
     if not player then return false end
     
     local team = player.Team
@@ -17,14 +17,14 @@ end
 
 local function setupTeamListener(callback)
 
-    local teamChangedConn = Wisper.Player:GetPropertyChangedSignal("Team"):Connect(callback)
+    local teamChangedConn = Liquidation.Player:GetPropertyChangedSignal("Team"):Connect(callback)
     
     local function onCharacterAdded(character)
         task.wait(0.5) 
         callback()
     end
     
-    local charAddedConn = Wisper.Player.CharacterAdded:Connect(onCharacterAdded)
+    local charAddedConn = Liquidation.Player.CharacterAdded:Connect(onCharacterAdded)
     
     task.spawn(callback)
     
@@ -158,7 +158,7 @@ local Crosshair = (function()
             screenGui.DisplayOrder = 999
             screenGui.ResetOnSpawn = false
             screenGui.IgnoreGuiInset = true
-            screenGui.Parent = Wisper.Player:WaitForChild("PlayerGui")
+            screenGui.Parent = Liquidation.Player:WaitForChild("PlayerGui")
         end
         
         local crosshairConfig = crosshairTypes[currentType]
@@ -181,7 +181,7 @@ local Crosshair = (function()
             rainbowConnection:Disconnect()
         end
         
-        rainbowConnection = Wisper.Services.RunService.RenderStepped:Connect(function()
+        rainbowConnection = Liquidation.Services.RunService.RenderStepped:Connect(function()
             if not frame or not rainbowEnabled then return end
             
             local time = tick()
@@ -215,15 +215,15 @@ local Crosshair = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.CrosshairEnabled = true
+        Liquidation.States.CrosshairEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -237,8 +237,8 @@ local Crosshair = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.CrosshairEnabled = false
-        Wisper.States.RainbowCrosshairEnabled = false
+        Liquidation.States.CrosshairEnabled = false
+        Liquidation.States.RainbowCrosshairEnabled = false
         
         if rainbowConnection then
             rainbowConnection:Disconnect()
@@ -270,10 +270,10 @@ local Crosshair = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -293,7 +293,7 @@ local Crosshair = (function()
     
     local function toggleRainbow(value)
         rainbowEnabled = value
-        Wisper.States.RainbowCrosshairEnabled = value
+        Liquidation.States.RainbowCrosshairEnabled = value
         
         if not value and frame then
             if currentType == "crosshair" then
@@ -336,7 +336,7 @@ local TwistSilentAim = (function()
     
     local function getRemote()
         local success = pcall(function()
-            remote = Wisper.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
+            remote = Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
                 :WaitForChild("Items", 5)
                 :WaitForChild("Twist of Fate", 5)
                 :WaitForChild("Fire", 5)
@@ -349,8 +349,8 @@ local TwistSilentAim = (function()
         local closestDistance = math.huge
         local myPos = workspace.CurrentCamera.CFrame.Position
         
-        for _, player in pairs(Wisper.Services.Players:GetPlayers()) do
-            if player ~= Wisper.Player and player.Character then
+        for _, player in pairs(Liquidation.Services.Players:GetPlayers()) do
+            if player ~= Liquidation.Player and player.Character then
                 local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
                 local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
                 if humanoid and humanoid.Health > 0 and rootPart then
@@ -417,15 +417,15 @@ local TwistSilentAim = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.TwistSilentAimEnabled = true
+        Liquidation.States.TwistSilentAimEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -439,15 +439,15 @@ local TwistSilentAim = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.TwistSilentAimEnabled = false
+        Liquidation.States.TwistSilentAimEnabled = false
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -474,7 +474,7 @@ local FastVault = (function()
     local FastVaultRemote = nil
     
     local function setFlowstate()
-        local character = Wisper.Player.Character
+        local character = Liquidation.Player.Character
         if character then
             pcall(character.SetAttribute, character, "Flowstate", true)
         end
@@ -484,7 +484,7 @@ local FastVault = (function()
         if hookInstalled then return true end
         
         local success = pcall(function()
-            local Remotes = Wisper.Services.ReplicatedStorage:WaitForChild("Remotes")
+            local Remotes = Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes")
             VaultEvent = Remotes.Window:WaitForChild("VaultEvent")
             VaultCompleteEvent = Remotes.Window:WaitForChild("VaultCompleteEvent")
             PalletSlideEvent = Remotes.Pallet:WaitForChild("PalletSlideEvent")
@@ -504,7 +504,7 @@ local FastVault = (function()
                 setFlowstate()
                 processing = true
                 if FastVaultRemote then
-                    FastVaultRemote:FireServer(Wisper.Player)
+                    FastVaultRemote:FireServer(Liquidation.Player)
                 end
                 VaultEvent:FireServer(args[1], true)
                 processing = false
@@ -522,7 +522,7 @@ local FastVault = (function()
                 setFlowstate()
                 processing = true
                 if FastVaultRemote then
-                    FastVaultRemote:FireServer(Wisper.Player)
+                    FastVaultRemote:FireServer(Liquidation.Player)
                 end
                 PalletSlideEvent:FireServer(args[1], true)
                 processing = false
@@ -539,7 +539,7 @@ local FastVault = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.FastVaultEnabled = true
+        Liquidation.States.FastVaultEnabled = true
         
         if not hookInstalled then
             setupHook()
@@ -549,7 +549,7 @@ local FastVault = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.FastVaultEnabled = false
+        Liquidation.States.FastVaultEnabled = false
     end
     
     return {
@@ -569,7 +569,7 @@ local AutoVictory = (function()
     local teamListeners = {}
     
     local function findExitPosition()
-        local map = Wisper.Services.Workspace:FindFirstChild("Map")
+        local map = Liquidation.Services.Workspace:FindFirstChild("Map")
         if not map then return nil end
         
         local exitPos = nil
@@ -645,7 +645,7 @@ local AutoVictory = (function()
             return 
         end
         
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         if not character then return end
         
         local root = character:FindFirstChild("HumanoidRootPart")
@@ -679,7 +679,7 @@ local AutoVictory = (function()
         end
         
         if enabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(function()
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(function()
                 if enabled and isSurvivorTeam() then
                     teleportToExit()
                 end
@@ -691,15 +691,15 @@ local AutoVictory = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.AutoVictoryEnabled = true
+        Liquidation.States.AutoVictoryEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -716,7 +716,7 @@ local AutoVictory = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.AutoVictoryEnabled = false
+        Liquidation.States.AutoVictoryEnabled = false
         
         if connection then
             connection:Disconnect()
@@ -729,10 +729,10 @@ local AutoVictory = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -758,7 +758,7 @@ local AutoVictoryV2 = (function()
     
     local function getShowResultsEvent()
         local success, event = pcall(function()
-            return Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Game"):WaitForChild("showresults")
+            return Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Game"):WaitForChild("showresults")
         end)
         return success and event or nil
     end
@@ -792,15 +792,15 @@ local AutoVictoryV2 = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.AutoVictoryV2Enabled = true
+        Liquidation.States.AutoVictoryV2Enabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -814,17 +814,17 @@ local AutoVictoryV2 = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.AutoVictoryV2Enabled = false
+        Liquidation.States.AutoVictoryV2Enabled = false
         
         resetEventState()
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -867,7 +867,7 @@ local NoSlowdown = (function()
             humanoid.Died:Connect(function()
                 if enabled then
                     task.wait(2) 
-                    local newChar = Wisper.getCharacter()
+                    local newChar = Liquidation.getCharacter()
                     if newChar then
                         setupNoSlowdownForCharacter(newChar)
                     end
@@ -878,7 +878,7 @@ local NoSlowdown = (function()
     
     local function updateNoSlowdownState()
         if enabled and isSurvivorTeam() then
-            local character = Wisper.getCharacter()
+            local character = Liquidation.getCharacter()
             if character then
                 setupNoSlowdownForCharacter(character)
             end
@@ -893,7 +893,7 @@ local NoSlowdown = (function()
                 connection = nil
             end
             
-            local character = Wisper.getCharacter()
+            local character = Liquidation.getCharacter()
             if character then
                 local humanoid = character:FindFirstChildOfClass("Humanoid")
                 if humanoid then
@@ -906,15 +906,15 @@ local NoSlowdown = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.NoSlowdownEnabled = true
+        Liquidation.States.NoSlowdownEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -934,14 +934,14 @@ local NoSlowdown = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.NoSlowdownEnabled = false
+        Liquidation.States.NoSlowdownEnabled = false
         
         if connection then
             connection:Disconnect()
             connection = nil
         end
         
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         if character then
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if humanoid then
@@ -952,10 +952,10 @@ local NoSlowdown = (function()
             for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1006,16 +1006,16 @@ local AutoParry = (function()
     local function PerformParry()
         if spamActive then return end
         spamActive = true
-        Wisper.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
+        Liquidation.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, true, game, 0)
         task.spawn(function()
             task.wait()
-            Wisper.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
+            Liquidation.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
             spamActive = false
         end)
     end
 
     local function isInRange(targetCharacter)
-        local myChar = Wisper.Player.Character
+        local myChar = Liquidation.Player.Character
         if not myChar then return false end
         local myRoot = myChar:FindFirstChild("HumanoidRootPart")
         local targetRoot = targetCharacter:FindFirstChild("HumanoidRootPart")
@@ -1034,12 +1034,12 @@ local AutoParry = (function()
 
     local function connectCharacter(player, character)
         disconnectPlayer(player)
-        if player == Wisper.Player then return end
+        if player == Liquidation.Player then return end
 
         animConnections[player] = {}
 
         local function onAnimPlayed(animTrack)
-            if not Wisper.States.AutoParryEnabled then return end
+            if not Liquidation.States.AutoParryEnabled then return end
             if not isSurvivorTeam() then return end
 
             local animId = animTrack.Animation and animTrack.Animation.AnimationId
@@ -1076,7 +1076,7 @@ local AutoParry = (function()
 
         local charAddedConn = player.CharacterAdded:Connect(function(newChar)
             task.wait(0.1)
-            if Wisper.States.AutoParryEnabled then
+            if Liquidation.States.AutoParryEnabled then
                 connectCharacter(player, newChar)
             end
         end)
@@ -1084,10 +1084,10 @@ local AutoParry = (function()
     end
 
     local function connectAllPlayers()
-        for _, player in ipairs(Wisper.Services.Players:GetPlayers()) do
-            if player ~= Wisper.Player and player.Character then
+        for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
+            if player ~= Liquidation.Player and player.Character then
                 connectCharacter(player, player.Character)
-            elseif player ~= Wisper.Player then
+            elseif player ~= Liquidation.Player then
                 animConnections[player] = {}
                 local charConn = player.CharacterAdded:Connect(function(char)
                     task.wait(0.1)
@@ -1097,7 +1097,7 @@ local AutoParry = (function()
             end
         end
 
-        playerAddedConn = Wisper.Services.Players.PlayerAdded:Connect(function(player)
+        playerAddedConn = Liquidation.Services.Players.PlayerAdded:Connect(function(player)
             animConnections[player] = {}
             local conn = player.CharacterAdded:Connect(function(char)
                 task.wait(0.1)
@@ -1106,7 +1106,7 @@ local AutoParry = (function()
             table.insert(animConnections[player], conn)
         end)
 
-        playerRemovingConn = Wisper.Services.Players.PlayerRemoving:Connect(function(player)
+        playerRemovingConn = Liquidation.Services.Players.PlayerRemoving:Connect(function(player)
             disconnectPlayer(player)
         end)
     end
@@ -1122,22 +1122,22 @@ local AutoParry = (function()
 
     local function setupAutoParry()
         disconnectAll()
-        if Wisper.States.AutoParryEnabled and isSurvivorTeam() then
+        if Liquidation.States.AutoParryEnabled and isSurvivorTeam() then
             connectAllPlayers()
         end
     end
 
     local function Enable()
-        if Wisper.States.AutoParryEnabled then return end
-        Wisper.States.AutoParryEnabled = true
+        if Liquidation.States.AutoParryEnabled then return end
+        Liquidation.States.AutoParryEnabled = true
 
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1147,20 +1147,20 @@ local AutoParry = (function()
     end
 
     local function Disable()
-        Wisper.States.AutoParryEnabled = false
+        Liquidation.States.AutoParryEnabled = false
         if spamActive then
             spamActive = false
-            Wisper.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
+            Liquidation.Services.VirtualInputManager:SendMouseButtonEvent(0, 0, 1, false, game, 0)
         end
         disconnectAll()
 
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1169,7 +1169,7 @@ local AutoParry = (function()
     return {
         Enable = Enable,
         Disable = Disable,
-        IsEnabled = function() return Wisper.States.AutoParryEnabled end,
+        IsEnabled = function() return Liquidation.States.AutoParryEnabled end,
         SetRange = function(value) 
             RANGE = tonumber(value) or 10
         end,
@@ -1203,13 +1203,13 @@ local VIEW_ANGLE_THRESHOLD = 90 -- Максимальный угол (граду
     end
 
     local function getTarget()
-        local localChar = Wisper.Player.Character
+        local localChar = Liquidation.Player.Character
         local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
         if not localRoot then return nil end
 
         local nearest, nearestDist = nil, math.huge
-        for _, player in ipairs(Wisper.Services.Players:GetPlayers()) do
-            if player ~= Wisper.Player and player.Character and isKillerTeam(player) then
+        for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
+            if player ~= Liquidation.Player and player.Character and isKillerTeam(player) then
                 local root = player.Character:FindFirstChild("HumanoidRootPart")
                 if root then
                     local dist = (root.Position - localRoot.Position).Magnitude
@@ -1231,9 +1231,9 @@ local VIEW_ANGLE_THRESHOLD = 90 -- Максимальный угол (граду
     local function clickRMB()
         local x = workspace.CurrentCamera.ViewportSize.X / 2
         local y = workspace.CurrentCamera.ViewportSize.Y / 2
-        Wisper.Services.VirtualInputManager:SendMouseButtonEvent(x, y, 1, true, game, 1)
+        Liquidation.Services.VirtualInputManager:SendMouseButtonEvent(x, y, 1, true, game, 1)
         task.delay(CLICK_HOLD, function()
-            Wisper.Services.VirtualInputManager:SendMouseButtonEvent(x, y, 1, false, game, 1)
+            Liquidation.Services.VirtualInputManager:SendMouseButtonEvent(x, y, 1, false, game, 1)
         end)
     end
 
@@ -1250,7 +1250,7 @@ local VIEW_ANGLE_THRESHOLD = 90 -- Максимальный угол (граду
             return
         end
 
-        local localChar = Wisper.Player.Character
+        local localChar = Liquidation.Player.Character
         local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
         local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
         if not localRoot or not targetRoot then
@@ -1301,16 +1301,16 @@ local VIEW_ANGLE_THRESHOLD = 90 -- Максимальный угол (граду
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.AutoParryV2Enabled = true
+        Liquidation.States.AutoParryV2Enabled = true
 
         for _, listener in ipairs(teamListeners) do
-            Wisper.safeDisconnect(listener)
+            Liquidation.safeDisconnect(listener)
         end
         teamListeners = {}
 
         table.insert(teamListeners, setupTeamListener(function()
             if enabled and isSurvivorTeam() then
-                connection = Wisper.Services.RunService.Heartbeat:Connect(updateLoop)
+                connection = Liquidation.Services.RunService.Heartbeat:Connect(updateLoop)
             else
                 if connection then
                     connection:Disconnect()
@@ -1320,19 +1320,19 @@ local VIEW_ANGLE_THRESHOLD = 90 -- Максимальный угол (граду
         end))
 
         if isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(updateLoop)
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(updateLoop)
         end
     end
 
     local function Disable()
         enabled = false
-        Wisper.States.AutoParryV2Enabled = false
+        Liquidation.States.AutoParryV2Enabled = false
         if connection then
             connection:Disconnect()
             connection = nil
         end
         for _, listener in ipairs(teamListeners) do
-            Wisper.safeDisconnect(listener)
+            Liquidation.safeDisconnect(listener)
         end
         teamListeners = {}
         lastArmPos = nil
@@ -1368,7 +1368,7 @@ local FakeParry = (function()
     local function startAnimation()
         if not isSurvivorTeam() then return false end
         
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         if not character then return false end
         
         local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -1399,7 +1399,7 @@ local FakeParry = (function()
         
         if not isSurvivorTeam() then return end
         
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         if character then
             local humanoid = character:FindFirstChildOfClass("Humanoid")
             if humanoid then
@@ -1407,7 +1407,7 @@ local FakeParry = (function()
             end
         end
         
-        characterConnection = Wisper.Player.CharacterAdded:Connect(function(newCharacter)
+        characterConnection = Liquidation.Player.CharacterAdded:Connect(function(newCharacter)
             if enabled and isSurvivorTeam() then
                 task.wait(1) 
                 
@@ -1442,15 +1442,15 @@ local FakeParry = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.FakeParryEnabled = true
+        Liquidation.States.FakeParryEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1464,7 +1464,7 @@ local FakeParry = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.FakeParryEnabled = false
+        Liquidation.States.FakeParryEnabled = false
         
         stopAnimation()
         
@@ -1476,10 +1476,10 @@ local FakeParry = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1509,19 +1509,19 @@ local healingStates = {
 }
 
 local function StartInstantHeal()
-    Wisper.States.InstantHealRunning = true
+    Liquidation.States.InstantHealRunning = true
     healingStates.instantHealRunning = true
     
     Survivor.Connections.instantHeal = task.spawn(function()
         while healingStates.instantHealRunning do
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             local myRoot = char and char:FindFirstChild("HumanoidRootPart")
             
             if char and myRoot then
                 local myPosition = myRoot.Position
                 
-                for _, target in ipairs(Wisper.Services.Players:GetPlayers()) do
-                    if target == Wisper.Player then continue end
+                for _, target in ipairs(Liquidation.Services.Players:GetPlayers()) do
+                    if target == Liquidation.Player then continue end
                     
                     if target.Character then
                         local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
@@ -1537,9 +1537,9 @@ local function StartInstantHeal()
                                 local humanoid = target.Character:FindFirstChild("Humanoid")
                                 if humanoid and humanoid.Health < humanoid.MaxHealth then
                                     pcall(function() 
-                                        if Wisper.Services.ReplicatedStorage.Remotes and 
-                                           Wisper.Services.ReplicatedStorage.Remotes.Healing then
-                                            Wisper.Services.ReplicatedStorage.Remotes.Healing.SkillCheckResultEvent:FireServer("success", 1, target.Character)
+                                        if Liquidation.Services.ReplicatedStorage.Remotes and 
+                                           Liquidation.Services.ReplicatedStorage.Remotes.Healing then
+                                            Liquidation.Services.ReplicatedStorage.Remotes.Healing.SkillCheckResultEvent:FireServer("success", 1, target.Character)
                                         end
                                     end)
                                 end
@@ -1555,15 +1555,15 @@ end
 
 local function StopInstantHeal()
     healingStates.instantHealRunning = false
-    Wisper.States.InstantHealRunning = false
-    Wisper.safeDisconnect(Survivor.Connections.instantHeal)
+    Liquidation.States.InstantHealRunning = false
+    Liquidation.safeDisconnect(Survivor.Connections.instantHeal)
 end
 
 local function SendStopHealEvent()
     pcall(function()
-        if Wisper.Services.ReplicatedStorage.Remotes and 
-           Wisper.Services.ReplicatedStorage.Remotes.Healing then
-            local healEvent = Wisper.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealEvent")
+        if Liquidation.Services.ReplicatedStorage.Remotes and 
+           Liquidation.Services.ReplicatedStorage.Remotes.Healing then
+            local healEvent = Liquidation.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealEvent")
             if healEvent then
                 healEvent:FireServer(false, false)
             end
@@ -1575,18 +1575,18 @@ local function StartSilentHeal()
     if healingStates.silentHealRunning then return end
     
     healingStates.silentHealRunning = true
-    Wisper.States.SilentHealRunning = true
+    Liquidation.States.SilentHealRunning = true
     local currentValue = true
     
     Survivor.Connections.silentHeal = task.spawn(function()
         while healingStates.silentHealRunning do
-            local character = Wisper.getCharacter()
-            if not character or not Wisper.getRootPart() then
+            local character = Liquidation.getCharacter()
+            if not character or not Liquidation.getRootPart() then
                 task.wait(0.4)
                 continue
             end
             
-            local humanoid = Wisper.getHumanoid()
+            local humanoid = Liquidation.getHumanoid()
             if not humanoid or humanoid.Health <= 0 then
                 task.wait(0.4)
                 continue
@@ -1601,8 +1601,8 @@ local function StartSilentHeal()
             local needsHealing = false
             local playersHealed = 0
             
-            for _, targetPlayer in ipairs(Wisper.Services.Players:GetPlayers()) do
-                if targetPlayer == Wisper.Player then continue end
+            for _, targetPlayer in ipairs(Liquidation.Services.Players:GetPlayers()) do
+                if targetPlayer == Liquidation.Player then continue end
                 
                 if targetPlayer and targetPlayer.Character then
                     local targetHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -1615,12 +1615,12 @@ local function StartSilentHeal()
                         if playersHealed <= 3 then
                             local args = {targetRoot, currentValue}
                             pcall(function() 
-                                if Wisper.Services.ReplicatedStorage.Remotes and 
-                                   Wisper.Services.ReplicatedStorage.Remotes.Healing then
-                                    Wisper.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
+                                if Liquidation.Services.ReplicatedStorage.Remotes and 
+                                   Liquidation.Services.ReplicatedStorage.Remotes.Healing then
+                                    Liquidation.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
                                     healingStates.lastHealTime = tick()
                                     
-                                    local healAnimRemote = Wisper.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
+                                    local healAnimRemote = Liquidation.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
                                     if healAnimRemote then
                                         healAnimRemote:FireServer(false)
                                     end
@@ -1630,9 +1630,9 @@ local function StartSilentHeal()
                     else
                         local args = {targetRoot, false}
                         pcall(function() 
-                            if Wisper.Services.ReplicatedStorage.Remotes and 
-                               Wisper.Services.ReplicatedStorage.Remotes.Healing then
-                                Wisper.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
+                            if Liquidation.Services.ReplicatedStorage.Remotes and 
+                               Liquidation.Services.ReplicatedStorage.Remotes.Healing then
+                                Liquidation.Services.ReplicatedStorage.Remotes.Healing.HealEvent:FireServer(unpack(args))
                             end
                         end)
                     end
@@ -1656,18 +1656,18 @@ local function StopSilentHeal()
     if not healingStates.silentHealRunning then return end
     
     healingStates.silentHealRunning = false
-    Wisper.States.SilentHealRunning = false
+    Liquidation.States.SilentHealRunning = false
     
     task.wait(0.1)
     
     if Survivor.Connections.silentHeal then
-        Wisper.safeDisconnect(Survivor.Connections.silentHeal)
+        Liquidation.safeDisconnect(Survivor.Connections.silentHeal)
         Survivor.Connections.silentHeal = nil
     end
     
     pcall(function()
-        if Wisper.Services.ReplicatedStorage.Remotes and Wisper.Services.ReplicatedStorage.Remotes.Healing then
-            local healAnimRemote = Wisper.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
+        if Liquidation.Services.ReplicatedStorage.Remotes and Liquidation.Services.ReplicatedStorage.Remotes.Healing then
+            local healAnimRemote = Liquidation.Services.ReplicatedStorage.Remotes.Healing:FindFirstChild("HealAnim")
             if healAnimRemote then
                 healAnimRemote:FireServer(false)
                 healAnimRemote:FireServer(false)
@@ -1681,9 +1681,9 @@ local function StopSilentHeal()
     end
     
     pcall(function()
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         if character then
-            local humanoid = Wisper.getHumanoid()
+            local humanoid = Liquidation.getHumanoid()
             if humanoid then
                 humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
             end
@@ -1702,7 +1702,7 @@ local NoFall = (function()
     
     local function getFallRemote()
         local success, remote = pcall(function()
-            return Wisper.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Mechanics"):WaitForChild("Fall")
+            return Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Mechanics"):WaitForChild("Fall")
         end)
         return success and remote or nil
     end
@@ -1786,15 +1786,15 @@ local NoFall = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.NoFallEnabled = true
+        Liquidation.States.NoFallEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1808,17 +1808,17 @@ local NoFall = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.NoFallEnabled = false
+        Liquidation.States.NoFallEnabled = false
         
         removeHook()
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -1839,9 +1839,9 @@ local GateTool = (function()
     local teamListeners = {}
 
     local function CreateTool()
-        if not Wisper.Player:FindFirstChild("Backpack") then return nil end
+        if not Liquidation.Player:FindFirstChild("Backpack") then return nil end
         
-        local existing = Wisper.Player.Backpack:FindFirstChild("Gate")
+        local existing = Liquidation.Player.Backpack:FindFirstChild("Gate")
         if existing then 
             pcall(function() 
                 if toolConnection then
@@ -1857,7 +1857,7 @@ local GateTool = (function()
         tool.RequiresHandle = false
         tool.CanBeDropped = false
         tool.ToolTip = "Gate Tool - Use to interact with gates"
-        tool.Parent = Wisper.Player.Backpack
+        tool.Parent = Liquidation.Player.Backpack
         
         tool.ManualActivationOnly = true
         
@@ -1868,7 +1868,7 @@ local GateTool = (function()
         if not isSurvivorTeam() then return false end
         
         local success = pcall(function()
-            local remotes = Wisper.Services.ReplicatedStorage:FindFirstChild("Remotes")
+            local remotes = Liquidation.Services.ReplicatedStorage:FindFirstChild("Remotes")
             if remotes then
                 local items = remotes:FindFirstChild("Items")
                 if items then
@@ -1898,14 +1898,14 @@ local GateTool = (function()
     end
 
     local function updateGateTool()
-        if Wisper.States.GateToolEnabled and isSurvivorTeam() then
+        if Liquidation.States.GateToolEnabled and isSurvivorTeam() then
             toolInstance = CreateTool()
             if toolInstance then 
                 toolConnection = toolInstance.Activated:Connect(function()
                     UseGate()
                 end)
             end
-        elseif Wisper.States.GateToolEnabled then            
+        elseif Liquidation.States.GateToolEnabled then            
             if toolInstance then 
                 pcall(function() 
                     if toolConnection then
@@ -1931,16 +1931,16 @@ local GateTool = (function()
     end
 
     local function Enable()
-        if Wisper.States.GateToolEnabled then return end
-        Wisper.States.GateToolEnabled = true
+        if Liquidation.States.GateToolEnabled then return end
+        Liquidation.States.GateToolEnabled = true
         
             for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -1950,8 +1950,8 @@ local GateTool = (function()
         
         updateGateTool()
         
-        local charAddedConn = Wisper.Player.CharacterAdded:Connect(function() 
-            if Wisper.States.GateToolEnabled then 
+        local charAddedConn = Liquidation.Player.CharacterAdded:Connect(function() 
+            if Liquidation.States.GateToolEnabled then 
                 task.wait(2)
                 updateGateTool()
             end 
@@ -1961,10 +1961,10 @@ local GateTool = (function()
     end
 
     local function Disable()
-        Wisper.States.GateToolEnabled = false
+        Liquidation.States.GateToolEnabled = false
         
         if toolConnection then
-            Wisper.safeDisconnect(toolConnection)
+            Liquidation.safeDisconnect(toolConnection)
             toolConnection = nil
         end
         if toolInstance then 
@@ -1974,7 +1974,7 @@ local GateTool = (function()
             toolInstance = nil
         end
         
-        local backpack = Wisper.Player:FindFirstChild("Backpack")
+        local backpack = Liquidation.Player:FindFirstChild("Backpack")
         if backpack then
             local tool = backpack:FindFirstChild("Gate")
             if tool then 
@@ -1985,10 +1985,10 @@ local GateTool = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2004,7 +2004,7 @@ local AutoPerfectSkill = (function()
     local teamListeners = {}
 
     local function FindSkillCheckGUI()
-        local PlayerGui = Wisper.Player:WaitForChild("PlayerGui")
+        local PlayerGui = Liquidation.Player:WaitForChild("PlayerGui")
         local skillCheckGui = PlayerGui:FindFirstChild("SkillCheckPromptGui")
         if skillCheckGui then
             local checkPart = skillCheckGui:FindFirstChild("Check")
@@ -2018,7 +2018,7 @@ local AutoPerfectSkill = (function()
     end
 
     local function DisableGeneratorFail()
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then
             local skillCheckGen = char:FindFirstChild("Skillcheck-gen")
             if skillCheckGen then skillCheckGen.Enabled = false end
@@ -2026,16 +2026,16 @@ local AutoPerfectSkill = (function()
     end
 
     local function PerformPerfectSkillCheck()
-        if not Wisper.States.autoSkillEnabled or not isSurvivorTeam() then return end
+        if not Liquidation.States.autoSkillEnabled or not isSurvivorTeam() then return end
         local skillCheckGui, checkPart, goalPart, linePart = FindSkillCheckGUI()
         if not skillCheckGui or not checkPart or not checkPart.Visible then return end
         
         local lineRot, goalRot = linePart.Rotation, goalPart.Rotation
         local minRot, maxRot = (104 + goalRot) % 360, (114 + goalRot) % 360
         if (minRot > maxRot and (lineRot >= minRot or lineRot <= maxRot)) or (lineRot >= minRot and lineRot <= maxRot) then
-            Wisper.Services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            Liquidation.Services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
             task.wait(0.01)
-            Wisper.Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+            Liquidation.Services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
             return true
         end
         return false
@@ -2047,23 +2047,23 @@ local AutoPerfectSkill = (function()
             connection = nil
         end
         
-        if Wisper.States.autoSkillEnabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(PerformPerfectSkillCheck)
+        if Liquidation.States.autoSkillEnabled and isSurvivorTeam() then
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(PerformPerfectSkillCheck)
             DisableGeneratorFail()
         end
     end
 
     local function Enable()
-        if Wisper.States.autoSkillEnabled then return end
-        Wisper.States.autoSkillEnabled = true
+        if Liquidation.States.autoSkillEnabled then return end
+        Liquidation.States.autoSkillEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -2075,7 +2075,7 @@ local AutoPerfectSkill = (function()
     end
 
     local function Disable()
-        Wisper.States.autoSkillEnabled = false
+        Liquidation.States.autoSkillEnabled = false
         
         if connection then
             connection:Disconnect()
@@ -2085,10 +2085,10 @@ local AutoPerfectSkill = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2109,29 +2109,29 @@ local Gamemode = (function()
             connection = nil
         end
         
-        if Wisper.States.autoHealEnabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(function()
-                if not Wisper.States.autoHealEnabled or not isSurvivorTeam() or not Wisper.Player.Character then 
+        if Liquidation.States.autoHealEnabled and isSurvivorTeam() then
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(function()
+                if not Liquidation.States.autoHealEnabled or not isSurvivorTeam() or not Liquidation.Player.Character then 
                     return 
                 end
-                local hum = Wisper.Player.Character:FindFirstChildOfClass("Humanoid")
+                local hum = Liquidation.Player.Character:FindFirstChildOfClass("Humanoid")
                 if hum and hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
             end)
-            elseif Wisper.States.autoHealEnabled then
+            elseif Liquidation.States.autoHealEnabled then
         end
     end
 
     local function Enable()
-        if Wisper.States.autoHealEnabled then return end
-        Wisper.States.autoHealEnabled = true
+        if Liquidation.States.autoHealEnabled then return end
+        Liquidation.States.autoHealEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
@@ -2143,7 +2143,7 @@ local Gamemode = (function()
     end
 
     local function Disable()
-        Wisper.States.autoHealEnabled = false
+        Liquidation.States.autoHealEnabled = false
         
         if connection then
             connection:Disconnect()
@@ -2153,10 +2153,10 @@ local Gamemode = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2175,7 +2175,7 @@ local NoHitbox = (function()
             return 
         end
         
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if not char then return end
         
         for _, part in ipairs(char:GetDescendants()) do 
@@ -2185,7 +2185,7 @@ local NoHitbox = (function()
         end
         
         if value then
-            Wisper.Player.CharacterAdded:Connect(function(newChar)
+            Liquidation.Player.CharacterAdded:Connect(function(newChar)
                 task.wait(1)
                 if isSurvivorTeam() then
                     for _, part in ipairs(newChar:GetDescendants()) do 
@@ -2202,24 +2202,24 @@ local NoHitbox = (function()
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         
         teamListeners = {}
         
         table.insert(teamListeners, setupTeamListener(function()
-            if Wisper.States.NoHitboxEnabled then
+            if Liquidation.States.NoHitboxEnabled then
                 updateNoHitbox(true)
             end
         end))
         
-        if isSurvivorTeam() and Wisper.States.NoHitboxEnabled then
+        if isSurvivorTeam() and Liquidation.States.NoHitboxEnabled then
             updateNoHitbox(true)
-        elseif Wisper.States.NoHitboxEnabled then
+        elseif Liquidation.States.NoHitboxEnabled then
         end
     end
 
@@ -2231,10 +2231,10 @@ local NoHitbox = (function()
             for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
                 for _, conn in ipairs(listener) do
-                    Wisper.safeDisconnect(conn)
+                    Liquidation.safeDisconnect(conn)
                 end
             else
-                Wisper.safeDisconnect(listener)
+                Liquidation.safeDisconnect(listener)
             end
         end
         teamListeners = {}
@@ -2253,7 +2253,7 @@ local SpeedVault = (function()
 
     local function applyAttribute()
         if not enabled or not isSurvivorTeam() then return end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if not char then return end
         pcall(function() char:SetAttribute("vaultspeed", currentValue) end)
     end
@@ -2261,9 +2261,9 @@ local SpeedVault = (function()
     local function updateState()
         if connection then connection:Disconnect(); connection = nil end
         if enabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(applyAttribute)
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(applyAttribute)
         else
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then pcall(function() char:SetAttribute("vaultspeed", nil) end) end
         end
     end
@@ -2271,11 +2271,11 @@ local SpeedVault = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.SpeedVaultEnabled = true
+        Liquidation.States.SpeedVaultEnabled = true
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
         table.insert(teamListeners, setupTeamListener(updateState))
@@ -2285,14 +2285,14 @@ local SpeedVault = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.SpeedVaultEnabled = false
+        Liquidation.States.SpeedVaultEnabled = false
         if connection then connection:Disconnect(); connection = nil end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then pcall(function() char:SetAttribute("vaultspeed", nil) end) end
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
     end
@@ -2315,7 +2315,7 @@ local SpeedHackAttr = (function()
 
     local function applyAttribute()
         if not enabled or not isSurvivorTeam() then return end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if not char then return end
         pcall(function() char:SetAttribute("speedboost", currentValue) end)
     end
@@ -2323,9 +2323,9 @@ local SpeedHackAttr = (function()
     local function updateState()
         if connection then connection:Disconnect(); connection = nil end
         if enabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(applyAttribute)
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(applyAttribute)
         else
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then pcall(function() char:SetAttribute("speedboost", nil) end) end
         end
     end
@@ -2333,11 +2333,11 @@ local SpeedHackAttr = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.SpeedHackAttrEnabled = true
+        Liquidation.States.SpeedHackAttrEnabled = true
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
         table.insert(teamListeners, setupTeamListener(updateState))
@@ -2347,14 +2347,14 @@ local SpeedHackAttr = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.SpeedHackAttrEnabled = false
+        Liquidation.States.SpeedHackAttrEnabled = false
         if connection then connection:Disconnect(); connection = nil end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then pcall(function() char:SetAttribute("speedboost", nil) end) end
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
     end
@@ -2377,7 +2377,7 @@ local VaultDistance = (function()
 
     local function applyAttribute()
         if not enabled or not isSurvivorTeam() then return end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if not char then return end
         pcall(function() char:SetAttribute("__VaultFireCount", currentValue) end)
     end
@@ -2385,9 +2385,9 @@ local VaultDistance = (function()
     local function updateState()
         if connection then connection:Disconnect(); connection = nil end
         if enabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(applyAttribute)
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(applyAttribute)
         else
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then pcall(function() char:SetAttribute("__VaultFireCount", nil) end) end
         end
     end
@@ -2395,11 +2395,11 @@ local VaultDistance = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.VaultDistanceEnabled = true
+        Liquidation.States.VaultDistanceEnabled = true
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
         table.insert(teamListeners, setupTeamListener(updateState))
@@ -2409,14 +2409,14 @@ local VaultDistance = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.VaultDistanceEnabled = false
+        Liquidation.States.VaultDistanceEnabled = false
         if connection then connection:Disconnect(); connection = nil end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then pcall(function() char:SetAttribute("__VaultFireCount", nil) end) end
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
     end
@@ -2439,7 +2439,7 @@ local HealBoost = (function()
 
     local function applyAttribute()
         if not enabled or not isSurvivorTeam() then return end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if not char then return end
         pcall(function() char:SetAttribute("healboost", currentValue) end)
     end
@@ -2447,9 +2447,9 @@ local HealBoost = (function()
     local function updateState()
         if connection then connection:Disconnect(); connection = nil end
         if enabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(applyAttribute)
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(applyAttribute)
         else
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then pcall(function() char:SetAttribute("healboost", nil) end) end
         end
     end
@@ -2457,11 +2457,11 @@ local HealBoost = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.HealBoostEnabled = true
+        Liquidation.States.HealBoostEnabled = true
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
         table.insert(teamListeners, setupTeamListener(updateState))
@@ -2471,14 +2471,14 @@ local HealBoost = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.HealBoostEnabled = false
+        Liquidation.States.HealBoostEnabled = false
         if connection then connection:Disconnect(); connection = nil end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then pcall(function() char:SetAttribute("healboost", nil) end) end
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
     end
@@ -2501,7 +2501,7 @@ local RepairBoost = (function()
 
     local function applyAttribute()
         if not enabled or not isSurvivorTeam() then return end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if not char then return end
         pcall(function() char:SetAttribute("repairboost", currentValue) end)
     end
@@ -2509,9 +2509,9 @@ local RepairBoost = (function()
     local function updateState()
         if connection then connection:Disconnect(); connection = nil end
         if enabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(applyAttribute)
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(applyAttribute)
         else
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then pcall(function() char:SetAttribute("repairboost", nil) end) end
         end
     end
@@ -2519,11 +2519,11 @@ local RepairBoost = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.RepairBoostEnabled = true
+        Liquidation.States.RepairBoostEnabled = true
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
         table.insert(teamListeners, setupTeamListener(updateState))
@@ -2533,14 +2533,14 @@ local RepairBoost = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.RepairBoostEnabled = false
+        Liquidation.States.RepairBoostEnabled = false
         if connection then connection:Disconnect(); connection = nil end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then pcall(function() char:SetAttribute("repairboost", nil) end) end
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
     end
@@ -2563,7 +2563,7 @@ local BleedBoost = (function()
 
     local function applyAttribute()
         if not enabled or not isSurvivorTeam() then return end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if not char then return end
         pcall(function() char:SetAttribute("bleedboost", currentValue) end)
     end
@@ -2571,9 +2571,9 @@ local BleedBoost = (function()
     local function updateState()
         if connection then connection:Disconnect(); connection = nil end
         if enabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(applyAttribute)
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(applyAttribute)
         else
-            local char = Wisper.getCharacter()
+            local char = Liquidation.getCharacter()
             if char then pcall(function() char:SetAttribute("bleedboost", nil) end) end
         end
     end
@@ -2581,11 +2581,11 @@ local BleedBoost = (function()
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.BleedBoostEnabled = true
+        Liquidation.States.BleedBoostEnabled = true
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
         table.insert(teamListeners, setupTeamListener(updateState))
@@ -2595,14 +2595,14 @@ local BleedBoost = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.BleedBoostEnabled = false
+        Liquidation.States.BleedBoostEnabled = false
         if connection then connection:Disconnect(); connection = nil end
-        local char = Wisper.getCharacter()
+        local char = Liquidation.getCharacter()
         if char then pcall(function() char:SetAttribute("bleedboost", nil) end) end
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
     end
@@ -2635,7 +2635,7 @@ local ParryCircleVisual = (function()
     end
 
     local function getDistanceToNearestKiller()
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         if not character then return math.huge end
         
         local root = character:FindFirstChild("HumanoidRootPart")
@@ -2644,8 +2644,8 @@ local ParryCircleVisual = (function()
         local myPos = root.Position
         local closestDist = math.huge
         
-        for _, player in ipairs(Wisper.Services.Players:GetPlayers()) do
-            if player ~= Wisper.Player and player.Character then
+        for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
+            if player ~= Liquidation.Player and player.Character then
                 local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
                 local targetHum = player.Character:FindFirstChildOfClass("Humanoid")
                 
@@ -2714,7 +2714,7 @@ local ParryCircleVisual = (function()
             return
         end
         
-        local character = Wisper.getCharacter()
+        local character = Liquidation.getCharacter()
         if not character then return end
         
         local root = character:FindFirstChild("HumanoidRootPart")
@@ -2767,19 +2767,19 @@ local ParryCircleVisual = (function()
     local function startLoop()
         if connection then connection:Disconnect(); connection = nil end
         if enabled and isSurvivorTeam() then
-            connection = Wisper.Services.RunService.Heartbeat:Connect(updateVisual)
+            connection = Liquidation.Services.RunService.Heartbeat:Connect(updateVisual)
         end
     end
 
     local function Enable()
         if enabled then return end
         enabled = true
-        Wisper.States.ParryCircleEnabled = true
+        Liquidation.States.ParryCircleEnabled = true
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
         
@@ -2795,15 +2795,15 @@ local ParryCircleVisual = (function()
     local function Disable()
         if not enabled then return end
         enabled = false
-        Wisper.States.ParryCircleEnabled = false
+        Liquidation.States.ParryCircleEnabled = false
         
         if connection then connection:Disconnect(); connection = nil end
         destroyCircle()
         
         for _, listener in ipairs(teamListeners) do
             if type(listener) == "table" then
-                for _, conn in ipairs(listener) do Wisper.safeDisconnect(conn) end
-            else Wisper.safeDisconnect(listener) end
+                for _, conn in ipairs(listener) do Liquidation.safeDisconnect(conn) end
+            else Liquidation.safeDisconnect(listener) end
         end
         teamListeners = {}
     end
@@ -2818,29 +2818,29 @@ end)()
 local function ResetAllHealing()
     healingStates.silentHealRunning = false
     healingStates.instantHealRunning = false
-    Wisper.States.SilentHealRunning = false
-    Wisper.States.InstantHealRunning = false
-    Wisper.States.autoHealEnabled = false
+    Liquidation.States.SilentHealRunning = false
+    Liquidation.States.InstantHealRunning = false
+    Liquidation.States.autoHealEnabled = false
     
     if Survivor.Connections.silentHeal then
-        Wisper.safeDisconnect(Survivor.Connections.silentHeal)
+        Liquidation.safeDisconnect(Survivor.Connections.silentHeal)
         Survivor.Connections.silentHeal = nil
     end
     if Survivor.Connections.instantHeal then
-        Wisper.safeDisconnect(Survivor.Connections.instantHeal)
+        Liquidation.safeDisconnect(Survivor.Connections.instantHeal)
         Survivor.Connections.instantHeal = nil
     end
 end
 
 
 function Survivor.Init(nxs)
-    Wisper = nxs
+    Liquidation = nxs
     
-    local Tabs = Wisper.Tabs
-    local Options = Wisper.Options
+    local Tabs = Liquidation.Tabs
+    local Options = Liquidation.Options
     
     Tabs.Main:AddParagraph({
-        Title = "Hello, " .. Wisper.Player.Name .. "!",
+        Title = "Hello, " .. Liquidation.Player.Name .. "!",
         Content = "Enjoy using the script"
     })
 
@@ -2851,7 +2851,7 @@ function Survivor.Init(nxs)
     })
 
     CrosshairToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 Crosshair.Enable() 
             else 
@@ -2866,7 +2866,7 @@ function Survivor.Init(nxs)
         Values = {"crosshair", "dot", "circle"},
         Default = "crosshair",
         Callback = function(value)
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 Crosshair.SetType(value)
             end)
         end
@@ -2879,7 +2879,7 @@ function Survivor.Init(nxs)
     })
 
     RainbowCrosshairToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             Crosshair.ToggleRainbow(v)
         end)
     end)
@@ -2891,7 +2891,7 @@ function Survivor.Init(nxs)
     })
 
     AutoVictoryToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 AutoVictory.Enable() 
             else 
@@ -2907,7 +2907,7 @@ function Survivor.Init(nxs)
     })
 
     AutoVictoryV2Toggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 AutoVictoryV2.Enable() 
             else 
@@ -2923,7 +2923,7 @@ function Survivor.Init(nxs)
     })
 
     NoSlowdownToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 NoSlowdown.Enable() 
             else 
@@ -2939,7 +2939,7 @@ function Survivor.Init(nxs)
     })
 
     AutoParryToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 AutoParry.Enable() 
             else 
@@ -2956,7 +2956,7 @@ function Survivor.Init(nxs)
         Max = 20,
         Rounding = 2,
         Callback = function(value)
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 AutoParry.SetRange(value)
             end)
         end
@@ -2969,7 +2969,7 @@ function Survivor.Init(nxs)
     })
 
     AutoParryV2Toggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 AutoParryV2.Enable() 
             else 
@@ -2986,7 +2986,7 @@ function Survivor.Init(nxs)
         Max = 30,
         Rounding = 1,
         Callback = function(value)
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 AutoParryV2.SetRadius(value)
             end)
         end
@@ -2998,7 +2998,7 @@ function Survivor.Init(nxs)
         Default = false
     })
     ParryCircleToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then ParryCircleVisual.Enable() else ParryCircleVisual.Disable() end
         end)
     end)
@@ -3010,7 +3010,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     FastVaultToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 FastVault.Enable() 
             else 
@@ -3026,7 +3026,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     TwistSilentAimToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 TwistSilentAim.Enable() 
             else 
@@ -3042,7 +3042,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     FakeParryToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 FakeParry.Enable() 
             else 
@@ -3058,7 +3058,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     NoFallToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 NoFall.Enable() 
             else 
@@ -3074,7 +3074,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     HealToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 Gamemode.Enable()
             else 
@@ -3090,7 +3090,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     InstantHealToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 StartInstantHeal() 
             else 
@@ -3106,7 +3106,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     SilentHealToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 StartSilentHeal() 
             else 
@@ -3122,7 +3122,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     GateToolToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 GateTool.Enable() 
             else 
@@ -3138,8 +3138,8 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     NoHitboxToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
-            Wisper.States.NoHitboxEnabled = v
+        Liquidation.SafeCallback(function()
+            Liquidation.States.NoHitboxEnabled = v
             if v then 
                 NoHitbox.Enable() 
             else 
@@ -3157,7 +3157,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
     })
 
     AutoSkillToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 AutoPerfectSkill.Enable()
             else 
@@ -3174,7 +3174,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Default = false
     })
     SpeedVaultToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then SpeedVault.Enable() else SpeedVault.Disable() end
         end)
     end)
@@ -3186,7 +3186,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Max = 50,
         Rounding = 2,
         Callback = function(value)
-            Wisper.SafeCallback(function() SpeedVault.SetValue(value) end)
+            Liquidation.SafeCallback(function() SpeedVault.SetValue(value) end)
         end
     })
 
@@ -3196,7 +3196,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Default = false
     })
     SpeedHackAttrToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then SpeedHackAttr.Enable() else SpeedHackAttr.Disable() end
         end)
     end)
@@ -3208,7 +3208,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Max = 100,
         Rounding = 2,
         Callback = function(value)
-            Wisper.SafeCallback(function() SpeedHackAttr.SetValue(value) end)
+            Liquidation.SafeCallback(function() SpeedHackAttr.SetValue(value) end)
         end
     })
 
@@ -3218,7 +3218,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Default = false
     })
     VaultDistanceToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then VaultDistance.Enable() else VaultDistance.Disable() end
         end)
     end)
@@ -3230,7 +3230,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Max = 30,
         Rounding = 1,
         Callback = function(value)
-            Wisper.SafeCallback(function() VaultDistance.SetValue(value) end)
+            Liquidation.SafeCallback(function() VaultDistance.SetValue(value) end)
         end
     })
 
@@ -3240,7 +3240,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Default = false
     })
     HealBoostToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then HealBoost.Enable() else HealBoost.Disable() end
         end)
     end)
@@ -3252,7 +3252,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Max = 100,
         Rounding = 2,
         Callback = function(value)
-            Wisper.SafeCallback(function() HealBoost.SetValue(value) end)
+            Liquidation.SafeCallback(function() HealBoost.SetValue(value) end)
         end
     })
 
@@ -3262,7 +3262,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Default = false
     })
     RepairBoostToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then RepairBoost.Enable() else RepairBoost.Disable() end
         end)
     end)
@@ -3274,7 +3274,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Max = 100,
         Rounding = 2,
         Callback = function(value)
-            Wisper.SafeCallback(function() RepairBoost.SetValue(value) end)
+            Liquidation.SafeCallback(function() RepairBoost.SetValue(value) end)
         end
     })
 
@@ -3284,7 +3284,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Default = false
     })
     BleedBoostToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then BleedBoost.Enable() else BleedBoost.Disable() end
         end)
     end)
@@ -3296,7 +3296,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
         Max = 1,
         Rounding = 2,
         Callback = function(value)
-            Wisper.SafeCallback(function() BleedBoost.SetValue(value) end)
+            Liquidation.SafeCallback(function() BleedBoost.SetValue(value) end)
         end
     })
     
@@ -3328,7 +3328,7 @@ function Survivor.Cleanup()
     ParryCircleVisual.Disable()
     
     for key, connection in pairs(Survivor.Connections) do
-        Wisper.safeDisconnect(connection)
+        Liquidation.safeDisconnect(connection)
     end
     Survivor.Connections = {}
 end

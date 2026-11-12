@@ -1,4 +1,4 @@
-local Wisper = _G.Wisper
+local Liquidation = _G.Liquidation
 
 local Fun = {
     CurrentEmoteTrack = nil,
@@ -16,8 +16,8 @@ local Fun = {
 }
 
 function Fun.Init(nxs)
-    Wisper = nxs
-    local Tabs = Wisper.Tabs
+    Liquidation = nxs
+    local Tabs = Liquidation.Tabs
     
     local emotesInitialized = Fun.InitializeEmotesSystem()
     
@@ -138,11 +138,11 @@ function Fun.Init(nxs)
 end
 
 function Fun.InitializeEmotesSystem()
-    if not Wisper.Services.ReplicatedStorage:FindFirstChild("Emotes") then 
+    if not Liquidation.Services.ReplicatedStorage:FindFirstChild("Emotes") then 
         return false 
     end
     
-    Fun.EmotesFolder = Wisper.Services.ReplicatedStorage:WaitForChild("Emotes")
+    Fun.EmotesFolder = Liquidation.Services.ReplicatedStorage:WaitForChild("Emotes")
     Fun.AvailableEmotes = {}
     
     for _, folder in pairs(Fun.EmotesFolder:GetChildren()) do
@@ -165,8 +165,8 @@ function Fun.PlayEmote(emoteName)
     local soundId = emoteFolder:GetAttribute("Song")
     if not animationId then return end
     
-    local character = Wisper.getCharacter()
-    local humanoid = Wisper.getHumanoid()
+    local character = Liquidation.getCharacter()
+    local humanoid = Liquidation.getHumanoid()
     if not character or not humanoid then return end
     
     local animation = Instance.new("Animation")
@@ -216,8 +216,8 @@ function Fun.StopEmote()
 end
 
 function Fun.StartJerk()
-    local humanoid = Wisper.getHumanoid()
-    local backpack = Wisper.Player:FindFirstChildWhichIsA("Backpack")
+    local humanoid = Liquidation.getHumanoid()
+    local backpack = Liquidation.Player:FindFirstChildWhichIsA("Backpack")
     if not humanoid or not backpack then return end
     
     if Fun.JerkTool.tool and Fun.JerkTool.tool.Parent then
@@ -233,7 +233,7 @@ function Fun.StartJerk()
     Fun.JerkTool.tool = tool
     
     local function playAnimation()
-        local currentHumanoid = Wisper.getHumanoid()
+        local currentHumanoid = Liquidation.getHumanoid()
         if not currentHumanoid or currentHumanoid.Health <= 0 then return end
         
         local isR15 = currentHumanoid.RigType == Enum.HumanoidRigType.R15
@@ -290,7 +290,7 @@ function Fun.StopJerk()
 end
 
 function Fun.ResetCharacter()
-    local humanoid = Wisper.getHumanoid()
+    local humanoid = Liquidation.getHumanoid()
     if humanoid then
         humanoid.Health = 0
     end
@@ -298,16 +298,16 @@ end
 
 function Fun.RejoinGame()
     local TeleportService = game:GetService("TeleportService")
-    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Wisper.Player)
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Liquidation.Player)
 end
 
 function Fun.ServerHop()
     local TeleportService = game:GetService("TeleportService")
-    TeleportService:Teleport(game.PlaceId, Wisper.Player)
+    TeleportService:Teleport(game.PlaceId, Liquidation.Player)
 end
 
 function Fun.Suicide()
-    local humanoid = Wisper.getHumanoid()
+    local humanoid = Liquidation.getHumanoid()
     if humanoid then
         humanoid.Health = 0
     end
@@ -322,12 +322,12 @@ function Fun.ToggleSpin(enabled)
 end
 
 function Fun.GetNearestPlayer(maxRange)
-    local myRoot = Wisper.getRootPart()
+    local myRoot = Liquidation.getRootPart()
     if not myRoot then return nil end
     local closest = nil
     local closestDist = maxRange or math.huge
-    for _, player in ipairs(Wisper.Services.Players:GetPlayers()) do
-        if player ~= Wisper.Player and player.Character then
+    for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
+        if player ~= Liquidation.Player and player.Character then
             local root = player.Character:FindFirstChild("HumanoidRootPart")
             local hum = player.Character:FindFirstChildOfClass("Humanoid")
             if root and hum and hum.Health > 0 then
@@ -343,7 +343,7 @@ function Fun.GetNearestPlayer(maxRange)
 end
 
 function Fun.FlingNearest()
-    local myRoot = Wisper.getRootPart()
+    local myRoot = Liquidation.getRootPart()
     if not myRoot then return end
 
     local target = Fun.GetNearestPlayer(20)
@@ -372,9 +372,9 @@ end
 function Fun.StartAutoFling()
     if Fun.FlingConnection then return end
     local returning = false
-    Fun.FlingConnection = Wisper.Services.RunService.Heartbeat:Connect(function()
+    Fun.FlingConnection = Liquidation.Services.RunService.Heartbeat:Connect(function()
         if returning then return end
-        local myRoot = Wisper.getRootPart()
+        local myRoot = Liquidation.getRootPart()
         if not myRoot then return end
 
         local target = Fun.GetNearestPlayer(20)
@@ -406,7 +406,7 @@ function Fun.StopAutoFling()
 end
 
 function Fun.StartSpin()
-    local character = Wisper.getCharacter()
+    local character = Liquidation.getCharacter()
     if not character then return end
     
     local rootPart = character:FindFirstChild("HumanoidRootPart")
@@ -416,7 +416,7 @@ function Fun.StartSpin()
         Fun.SpinConnection:Disconnect()
     end
     
-    Fun.SpinConnection = Wisper.Services.RunService.Heartbeat:Connect(function()
+    Fun.SpinConnection = Liquidation.Services.RunService.Heartbeat:Connect(function()
         if rootPart and rootPart.Parent then
             rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(10), 0)
         else

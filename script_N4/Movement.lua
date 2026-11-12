@@ -1,4 +1,4 @@
-local Wisper = _G.Wisper
+local Liquidation = _G.Liquidation
 
 local Movement = {
     Connections = {},
@@ -22,17 +22,17 @@ local Movement = {
     }
 }
 
--- Use global helper functions from Wisper
+-- Use global helper functions from Liquidation
 function Movement.GetCharacter()
-    return Wisper.getCharacter()
+    return Liquidation.getCharacter()
 end
 
 function Movement.GetHumanoid()
-    return Wisper.getHumanoid()
+    return Liquidation.getHumanoid()
 end
 
 function Movement.GetRootPart()
-    return Wisper.getRootPart()
+    return Liquidation.getRootPart()
 end
 
 -- WALK SPEED --
@@ -48,8 +48,8 @@ local WalkSpeed = (function()
         WALKSPEED_ENABLED = true
         Movement.States.WalkSpeedEnabled = true
         
-        speedConnection = Wisper.Services.RunService.Heartbeat:Connect(function()
-            if not WALKSPEED_ENABLED or not Wisper.Player.Character then
+        speedConnection = Liquidation.Services.RunService.Heartbeat:Connect(function()
+            if not WALKSPEED_ENABLED or not Liquidation.Player.Character then
                 if speedConnection then
                     speedConnection:Disconnect()
                     speedConnection = nil
@@ -57,23 +57,23 @@ local WalkSpeed = (function()
                 return
             end
             
-            local character = Wisper.Player.Character
+            local character = Liquidation.Player.Character
             local rootPart = character:FindFirstChild("HumanoidRootPart")
             if not rootPart then return end
             
             local direction = Vector3.new(0, 0, 0)
-            local camera = Wisper.Services.Workspace.CurrentCamera
+            local camera = Liquidation.Services.Workspace.CurrentCamera
             
-            if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then
                 direction = direction + camera.CFrame.LookVector
             end
-            if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then
                 direction = direction - camera.CFrame.LookVector
             end
-            if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then
                 direction = direction - camera.CFrame.RightVector
             end
-            if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then
                 direction = direction + camera.CFrame.RightVector
             end
             
@@ -92,7 +92,7 @@ local WalkSpeed = (function()
         Movement.States.WalkSpeedEnabled = false
         
         if speedConnection then
-            Wisper.safeDisconnect(speedConnection)
+            Liquidation.safeDisconnect(speedConnection)
             speedConnection = nil
         end
     end
@@ -152,7 +152,7 @@ local NoClip = (function()
             saveOriginalCollisions(character)
         end
         
-        noclipConnection = Wisper.Services.RunService.Stepped:Connect(function()
+        noclipConnection = Liquidation.Services.RunService.Stepped:Connect(function()
             if not noclipEnabled or not Movement.GetCharacter() then 
                 if noclipConnection then
                     noclipConnection:Disconnect()
@@ -173,7 +173,7 @@ local NoClip = (function()
             end
         end)
         
-        Wisper.Player.CharacterAdded:Connect(function(newChar)
+        Liquidation.Player.CharacterAdded:Connect(function(newChar)
             if noclipEnabled then
                 task.wait(1)
                 saveOriginalCollisions(newChar)
@@ -228,7 +228,7 @@ local function enableFly()
     Movement.Objects.bodyGyro.CFrame = rootPart.CFrame
     Movement.Objects.bodyGyro.Parent = rootPart
 
-    Movement.Connections.flyLoop = Wisper.Services.RunService.Heartbeat:Connect(function()
+    Movement.Connections.flyLoop = Liquidation.Services.RunService.Heartbeat:Connect(function()
         if not Movement.States.FlyEnabled or not Movement.Objects.bodyVelocity or not Movement.Objects.bodyGyro or 
            not character or not humanoid or not rootPart then
             if Movement.Connections.flyLoop then
@@ -238,25 +238,25 @@ local function enableFly()
             return
         end
         
-        local camera = Wisper.Services.Workspace.CurrentCamera
+        local camera = Liquidation.Services.Workspace.CurrentCamera
         local direction = Vector3.new(0, 0, 0)
         
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then 
             direction = direction + camera.CFrame.LookVector 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then 
             direction = direction - camera.CFrame.LookVector 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then 
             direction = direction - camera.CFrame.RightVector 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then 
             direction = direction + camera.CFrame.RightVector 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
             direction = direction + Vector3.new(0, 1, 0) 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then 
             direction = direction + Vector3.new(0, -1, 0) 
         end
 
@@ -298,21 +298,21 @@ end
 local function lockMouse()
     if not Movement.States.FreeCameraEnabled then return end
     Movement.Objects.mouseLocked = true
-    Wisper.Services.UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-    Wisper.Services.UserInputService.MouseIconEnabled = false
+    Liquidation.Services.UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+    Liquidation.Services.UserInputService.MouseIconEnabled = false
 end
 
 local function unlockMouse()
     Movement.Objects.mouseLocked = false
-    Wisper.Services.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-    Wisper.Services.UserInputService.MouseIconEnabled = true
+    Liquidation.Services.UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    Liquidation.Services.UserInputService.MouseIconEnabled = true
 end
 
 local function startFreeCamera()
     if Movement.States.FreeCameraEnabled then return end
     Movement.States.FreeCameraEnabled = true
     
-    local camera = Wisper.Camera
+    local camera = Liquidation.Camera
     Movement.Objects.originalCameraType = camera.CameraType
     Movement.Objects.originalCameraSubject = camera.CameraSubject
     camera.CameraType = Enum.CameraType.Scriptable
@@ -334,7 +334,7 @@ local function startFreeCamera()
         end
     end
     
-    Movement.Connections.freeCamera = Wisper.Services.RunService.RenderStepped:Connect(function(delta)
+    Movement.Connections.freeCamera = Liquidation.Services.RunService.RenderStepped:Connect(function(delta)
         if not Movement.States.FreeCameraEnabled then 
             if Movement.Connections.freeCamera then
                 Movement.Connections.freeCamera:Disconnect()
@@ -343,7 +343,7 @@ local function startFreeCamera()
             return 
         end
         
-        local mouseDelta = Wisper.Services.UserInputService:GetMouseDelta()
+        local mouseDelta = Liquidation.Services.UserInputService:GetMouseDelta()
         cameraRotation = cameraRotation + Vector2.new(-mouseDelta.X * 0.003, -mouseDelta.Y * 0.003)
         cameraRotation = Vector2.new(cameraRotation.X, 
             math.clamp(cameraRotation.Y, -math.pi/2 + 0.1, math.pi/2 - 0.1))
@@ -351,23 +351,23 @@ local function startFreeCamera()
         local rotationCFrame = CFrame.Angles(0, cameraRotation.X, 0) * CFrame.Angles(cameraRotation.Y, 0, 0)
         local moveDirection = Vector3.new(0, 0, 0)
         
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.W) then 
             moveDirection = moveDirection + rotationCFrame.LookVector 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.S) then 
             moveDirection = moveDirection - rotationCFrame.LookVector 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.A) then 
             moveDirection = moveDirection - rotationCFrame.RightVector 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.D) then 
             moveDirection = moveDirection + rotationCFrame.RightVector 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.E) or 
-           Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.E) or 
+           Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
             moveDirection = moveDirection + Vector3.new(0, 1, 0) 
         end
-        if Wisper.Services.UserInputService:IsKeyDown(Enum.KeyCode.Q) then 
+        if Liquidation.Services.UserInputService:IsKeyDown(Enum.KeyCode.Q) then 
             moveDirection = moveDirection + Vector3.new(0, -1, 0) 
         end
         
@@ -391,7 +391,7 @@ local function stopFreeCamera()
         Movement.Connections.freeCamera = nil
     end
     
-    local camera = Wisper.Camera
+    local camera = Liquidation.Camera
     camera.CameraType = Movement.Objects.originalCameraType
     camera.CameraSubject = Movement.Objects.originalCameraSubject
     
@@ -437,13 +437,13 @@ local InfiniteLunge = (function()
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             if input.UserInputState == Enum.UserInputState.Begin then
                 isLunging = true
-                if Wisper.Player.Character then
+                if Liquidation.Player.Character then
                     if lungeConnection then
                         lungeConnection:Disconnect()
                     end
                     
-                    lungeConnection = Wisper.Services.RunService.Heartbeat:Connect(function()
-                        if not Movement.States.InfiniteLungeEnabled or not isLunging or not Wisper.Player.Character then
+                    lungeConnection = Liquidation.Services.RunService.Heartbeat:Connect(function()
+                        if not Movement.States.InfiniteLungeEnabled or not isLunging or not Liquidation.Player.Character then
                             if lungeConnection then
                                 lungeConnection:Disconnect()
                                 lungeConnection = nil
@@ -451,7 +451,7 @@ local InfiniteLunge = (function()
                             return
                         end
                         
-                        local rootPart = Wisper.Player.Character:FindFirstChild("HumanoidRootPart")
+                        local rootPart = Liquidation.Player.Character:FindFirstChild("HumanoidRootPart")
                         
                         if rootPart then
                             local lookVector = rootPart.CFrame.LookVector
@@ -472,8 +472,8 @@ local InfiniteLunge = (function()
     end
     
 
-    local inputBeganConn = Wisper.Services.UserInputService.InputBegan:Connect(HandleInput)
-    local inputEndedConn = Wisper.Services.UserInputService.InputEnded:Connect(HandleInput)
+    local inputBeganConn = Liquidation.Services.UserInputService.InputBegan:Connect(HandleInput)
+    local inputEndedConn = Liquidation.Services.UserInputService.InputEnded:Connect(HandleInput)
 
     Movement.Connections.InfiniteLungeBegan = inputBeganConn
     Movement.Connections.InfiniteLungeEnded = inputEndedConn
@@ -492,7 +492,7 @@ end)()
 -- FOV SYSTEM --
 
 local function ApplyFOV()
-    local camera = Wisper.Camera
+    local camera = Liquidation.Camera
     if camera and Movement.Settings.fovEnabled then
         Movement.Settings.fovTargetValue = math.max(1, Movement.Settings.fovValue)
     elseif camera then
@@ -501,29 +501,29 @@ local function ApplyFOV()
 end
 
 function Movement.Init(nxs)
-    Wisper = nxs
+    Liquidation = nxs
     
-    local Tabs = Wisper.Tabs
-    local Options = Wisper.Options
+    local Tabs = Liquidation.Tabs
+    local Options = Liquidation.Options
     
-    Wisper.Services.Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    Liquidation.Services.Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
         task.wait(0.1)
-        Wisper.Camera = Wisper.Services.Workspace.CurrentCamera
+        Liquidation.Camera = Liquidation.Services.Workspace.CurrentCamera
         ApplyFOV()
     end)
 
     pcall(function()
-        Wisper.Services.RunService:UnbindFromRenderStep("NexusFOVUpdater")
+        Liquidation.Services.RunService:UnbindFromRenderStep("NexusFOVUpdater")
     end)
     
-    Wisper.Services.RunService:BindToRenderStep("NexusFOVUpdater", Enum.RenderPriority.Camera.Value + 1, function()
-        if Movement.Settings.fovEnabled and Wisper.Camera then
+    Liquidation.Services.RunService:BindToRenderStep("NexusFOVUpdater", Enum.RenderPriority.Camera.Value + 1, function()
+        if Movement.Settings.fovEnabled and Liquidation.Camera then
             local targetFOV = math.max(1, Movement.Settings.fovTargetValue or 70)
-            Wisper.Camera.FieldOfView = targetFOV
+            Liquidation.Camera.FieldOfView = targetFOV
         end
     end)
 
-    if Wisper.IS_DESKTOP then
+    if Liquidation.IS_DESKTOP then
         local InfiniteLungeToggle = Tabs.Movement:AddToggle("InfiniteLunge", {
             Title = "Infinite Lunge", 
             Description = "Hold LMB to lunge forward", 
@@ -531,7 +531,7 @@ function Movement.Init(nxs)
         })
 
         InfiniteLungeToggle:OnChanged(function(v) 
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 if v then 
                     InfiniteLunge.Enable() 
                 else 
@@ -548,7 +548,7 @@ function Movement.Init(nxs)
             Max = 200, 
             Rounding = 0, 
             Callback = function(value) 
-                Wisper.SafeCallback(function()
+                Liquidation.SafeCallback(function()
                     InfiniteLunge.SetSpeed(value)
                 end)
             end
@@ -562,7 +562,7 @@ function Movement.Init(nxs)
     })
 
     WalkSpeedToggle:OnChanged(function(v) 
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if v then 
                 WalkSpeed.Enable() 
             else 
@@ -579,7 +579,7 @@ function Movement.Init(nxs)
         Max = 200, 
         Rounding = 0, 
         Callback = function(value) 
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 WalkSpeed.SetSpeed(value)
             end)
         end
@@ -592,7 +592,7 @@ function Movement.Init(nxs)
     })
 
     NoclipToggle:OnChanged(function(value)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             if value then 
                 NoClip.Enable() 
             else 
@@ -608,7 +608,7 @@ function Movement.Init(nxs)
     })
 
     FOVToggle:OnChanged(function(v)
-        Wisper.SafeCallback(function()
+        Liquidation.SafeCallback(function()
             Movement.Settings.fovEnabled = v
             ApplyFOV()
         end)
@@ -622,7 +622,7 @@ function Movement.Init(nxs)
         Max = 120,
         Rounding = 0,
         Callback = function(value)
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 Movement.Settings.fovValue = value
                 ApplyFOV()
             end)
@@ -631,8 +631,8 @@ function Movement.Init(nxs)
 
     local function GetPlayerNames()
         local names = {"--"}
-        for _, player in ipairs(Wisper.Services.Players:GetPlayers()) do
-            if player ~= Wisper.Player then
+        for _, player in ipairs(Liquidation.Services.Players:GetPlayers()) do
+            if player ~= Liquidation.Player then
                 table.insert(names, player.Name)
             end
         end
@@ -652,13 +652,13 @@ function Movement.Init(nxs)
         end
     end
 
-    table.insert(Movement.Connections, Wisper.Services.Players.PlayerAdded:Connect(UpdatePlayerDropdown))
-    table.insert(Movement.Connections, Wisper.Services.Players.PlayerRemoving:Connect(UpdatePlayerDropdown))
+    table.insert(Movement.Connections, Liquidation.Services.Players.PlayerAdded:Connect(UpdatePlayerDropdown))
+    table.insert(Movement.Connections, Liquidation.Services.Players.PlayerRemoving:Connect(UpdatePlayerDropdown))
 
     PlayerDropdown:OnChanged(function(value)
         if value ~= "--" then
-            Wisper.SafeCallback(function()
-                local targetPlayer = Wisper.Services.Players:FindFirstChild(value)
+            Liquidation.SafeCallback(function()
+                local targetPlayer = Liquidation.Services.Players:FindFirstChild(value)
                 if targetPlayer then
                     local targetChar = targetPlayer.Character
                     if targetChar then
@@ -667,7 +667,7 @@ function Movement.Init(nxs)
                         
                         if localRoot and targetRoot then
                             localRoot.CFrame = targetRoot.CFrame + Vector3.new(0, 3, 0)
-                            Wisper.Notify("Teleport", "Teleported to " .. value, 3)
+                            Liquidation.Notify("Teleport", "Teleported to " .. value, 3)
                         end
                     end
                 end
@@ -681,7 +681,7 @@ function Movement.Init(nxs)
         end
     end)
 
-    if Wisper.IS_DESKTOP then
+    if Liquidation.IS_DESKTOP then
         local FlyToggle = Tabs.Movement:AddToggle("Fly", {
             Title = "Fly", 
             Description = "Allows flying in any direction", 
@@ -689,7 +689,7 @@ function Movement.Init(nxs)
         })
 
         FlyToggle:OnChanged(function(value) 
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 if value then 
                     enableFly() 
                 else 
@@ -706,7 +706,7 @@ function Movement.Init(nxs)
             Max = 200, 
             Rounding = 0, 
             Callback = function(value) 
-                Wisper.SafeCallback(function()
+                Liquidation.SafeCallback(function()
                     Movement.Settings.flySpeed = value
                 end)
             end
@@ -719,7 +719,7 @@ function Movement.Init(nxs)
         })
 
         FreeCameraToggle:OnChanged(function(value) 
-            Wisper.SafeCallback(function()
+            Liquidation.SafeCallback(function()
                 if value then 
                     startFreeCamera() 
                 else 
@@ -736,7 +736,7 @@ function Movement.Init(nxs)
             Max = 100, 
             Rounding = 0, 
             Callback = function(value) 
-                Wisper.SafeCallback(function()
+                Liquidation.SafeCallback(function()
                     Movement.Settings.freeCameraSpeed = value
                 end)
             end
@@ -755,10 +755,10 @@ function Movement.Cleanup()
     Movement.Settings.fovEnabled = false
     
     pcall(function()
-        Wisper.Services.RunService:UnbindFromRenderStep("NexusFOVUpdater")
+        Liquidation.Services.RunService:UnbindFromRenderStep("NexusFOVUpdater")
     end)
     
-    local camera = Wisper.Camera
+    local camera = Liquidation.Camera
     if camera then
         camera.FieldOfView = 70
     end
@@ -773,7 +773,7 @@ function Movement.Cleanup()
     end
     
     for key, connection in pairs(Movement.Connections) do
-        Wisper.safeDisconnect(connection)
+        Liquidation.safeDisconnect(connection)
     end
     Movement.Connections = {}
     
