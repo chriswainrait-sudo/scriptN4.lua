@@ -3,6 +3,7 @@
 ]]
 
 local Liquidation = _G.Liquidation
+local CollectionService = game:GetService("CollectionService")
 
 local Visual = {
     Connections = {},
@@ -107,10 +108,10 @@ end
 
 function Visual.EnsureHighlight(model, color, isObject)
     if not model then return end
-    local hl = model:FindFirstChild("VD_HL")
+    local hl = model:FindFirstChild("Liquidation_Highlight")
     if not hl then
         hl = Instance.new("Highlight")
-        hl.Name = "VD_HL"
+        hl.Name = "Liquidation_Highlight"
         hl.Adornee = model
         hl.FillColor = color
         hl.FillTransparency = 0.8
@@ -133,17 +134,17 @@ function Visual.EnsureHighlight(model, color, isObject)
 end
 
 function Visual.ClearHighlight(model)
-    if model and model:FindFirstChild("VD_HL") then
-        pcall(function() model.VD_HL:Destroy() end)
+    if model and model:FindFirstChild("Liquidation_Highlight") then
+        pcall(function() model.Liquidation_Highlight:Destroy() end)
     end
 end
 
 function Visual.EnsureLabel(model, text, isGenerator, textColor)
     if not model then return end
-    local lbl = model:FindFirstChild("VD_Label")
+    local lbl = model:FindFirstChild("Liquidation_Label")
     if not lbl then
         lbl = Instance.new("BillboardGui")
-        lbl.Name = "VD_Label"
+        lbl.Name = "Liquidation_Label"
         if isGenerator then
             lbl.Size = UDim2.new(0,100,0,25)
             lbl.StudsOffset = Vector3.new(0,2.5,0)
@@ -191,8 +192,8 @@ function Visual.EnsureLabel(model, text, isGenerator, textColor)
 end
 
 function Visual.ClearLabel(model)
-    if model and model:FindFirstChild("VD_Label") then
-        pcall(function() model.VD_Label:Destroy() end)
+    if model and model:FindFirstChild("Liquidation_Label") then
+        pcall(function() model.Liquidation_Label:Destroy() end)
     end
 end
 
@@ -214,10 +215,10 @@ function Visual.EnsureGeneratorESP(generator, progress, color)
     color = color or getGeneratorColor(progress)
     local percentText = Visual.ESP.showGeneratorPercent and string.format("%d%%", math.floor(progress * 100)) or ""
     
-    local hl = generator:FindFirstChild("VD_HL")
+    local hl = generator:FindFirstChild("Liquidation_Highlight")
     if not hl then
         hl = Instance.new("Highlight")
-        hl.Name = "VD_HL"
+        hl.Name = "Liquidation_Highlight"
         hl.Adornee = generator
         hl.FillColor = color
         hl.FillTransparency = 0.7
@@ -404,62 +405,68 @@ function Visual.ToggleAutoFarmGift(enabled)
     end
 end
 
-function Visual.AddObjectToTrack(obj)
-    local nameLower = obj.Name:lower()
-    
-    if nameLower:find("generator") then 
-        Visual.ESP.trackedObjects[obj] = "Generators"
-    elseif nameLower:find("pallet") then
-        
-        if Visual.IsValidPallet(obj) then
-            Visual.ESP.trackedObjects[obj] = "Pallets"
+function Visual.GetPalletModel(object)
+    local world = Liquidation.Services.Workspace
+    local node = object
+    while node and node ~= world do
+        if node:IsA("Model") then
+            if node:GetAttribute("PalletState") ~= nil or CollectionService:HasTag(node, "pallet") then return node end
+            if node:FindFirstChild("Intact") and node:FindFirstChild("Broken") then return node end
         end
-    elseif nameLower:find("gate") then 
-        Visual.ESP.trackedObjects[obj] = "ExitGates"
-    elseif nameLower:find("window") then 
-        Visual.ESP.trackedObjects[obj] = "Windows"
-    elseif nameLower:find("hook") then 
-        Visual.ESP.trackedObjects[obj] = "Hooks"
-    elseif nameLower:find("gift") then
-        if Visual.IsValidGift(obj) then
-            Visual.ESP.trackedObjects[obj] = "Gifts"
-        end
+        node = node.Parent
     end
+    if not object or not object:IsA("Model") then return end
+    if object.Name:lower():find("palletpoint", 1, true) then return object end
+    if object.Name:lower():find("pallet", 1, true) and object:FindFirstChildWhichIsA("BasePart", true) then return object end
+    if object:FindFirstChild("PalletPoint", true) or object:FindFirstChild("PrimaryPartPallet", true) then return object end
 end
-
-function Visual.IsValidPallet(obj)
-    if obj.Name:lower():find("palletpoint") then
-        return true
+function Visual.IsValidPallet(object) return Visual.GetPalletModel(object) ~= nil end
+function Visual.AddObjectToTrack(object)
+    if not object or not object:IsDescendantOf(Liquidation.Services.Workspace) then return end
+    local pallet = Visual.GetPalletModel(object)
+    if pallet then
+        Visual.ESP.trackedObjects[pallet] = "Pallets"
+        return
     end
-    
-    for _, child in ipairs(obj:GetChildren()) do
-        if child.Name:lower():find("palletpoint") then
-            return true
-        end
-    end
-    
-    if obj:IsA("Model") and obj.PrimaryPart then
-        local primaryName = obj.PrimaryPart.Name:lower()
-        if primaryName:find("palletpoint") or primaryName:find("pallet") then
-            return true
-        end
-    end
-    
-    return false
+    if not object:IsA("Model") then return end
+    local name = object.Name:lower()
+    if name:find("generator", 1, true) then Visual.ESP.trackedObjects[object] = "Generators"
+    elseif name:find("gate", 1, true) then Visual.ESP.trackedObjects[object] = "ExitGates"
+    elseif name:find("window", 1, true) then Visual.ESP.trackedObjects[object] = "Windows"
+    elseif name:find("hook", 1, true) then Visual.ESP.trackedObjects[object] = "Hooks"
+    elseif name:find("gift", 1, true) and Visual.IsValidGift(object) then Visual.ESP.trackedObjects[object] = "Gifts" end
 end
-
 function Visual.TrackObjects()
-    Visual.ESP.trackedObjects = {}
-    
-    for _, obj in ipairs(Liquidation.Services.Workspace:GetDescendants()) do
-        if obj:IsA("Model") then
-            Visual.AddObjectToTrack(obj)
-        end
+    for _, key in ipairs({"descendantAdded", "descendantRemoving", "palletAdded", "palletRemoved"}) do
+        Liquidation.safeDisconnect(Visual.ESP.espConnections[key])
+        Visual.ESP.espConnections[key] = nil
     end
-    
-    Visual.ESP.espConnections.descendantAdded = Liquidation.Services.Workspace.DescendantAdded:Connect(function(obj)
-        if obj:IsA("Model") then
-            Visual.AddObjectToTrack(obj)
+    table.clear(Visual.ESP.trackedObjects)
+    local world = Liquidation.Services.Workspace
+    for _, object in ipairs(world:GetDescendants()) do
+        if object:IsA("Model") then Visual.AddObjectToTrack(object) end
+    end
+    for _, object in ipairs(CollectionService:GetTagged("pallet")) do Visual.AddObjectToTrack(object) end
+    Visual.ESP.espConnections.descendantAdded = world.DescendantAdded:Connect(function(object)
+        if not object:IsA("Model") and not object:IsA("BasePart") then return end
+        task.defer(function()
+            if not Visual.ESP.espLoopRunning then return end
+            Visual.AddObjectToTrack(object)
+            if object.Parent then Visual.AddObjectToTrack(object.Parent) end
+        end)
+    end)
+    Visual.ESP.espConnections.descendantRemoving = world.DescendantRemoving:Connect(function(object)
+        if Visual.ESP.trackedObjects[object] then
+            Visual.ClearHighlight(object)
+            Visual.ClearLabel(object)
+            Visual.ESP.trackedObjects[object] = nil
+        end
+    end)
+    Visual.ESP.espConnections.palletAdded = CollectionService:GetInstanceAddedSignal("pallet"):Connect(Visual.AddObjectToTrack)
+    Visual.ESP.espConnections.palletRemoved = CollectionService:GetInstanceRemovedSignal("pallet"):Connect(function(object)
+        if object:GetAttribute("PalletState") == nil then
+            Visual.ClearHighlight(object)
+            Visual.ESP.trackedObjects[object] = nil
         end
     end)
 end
@@ -491,7 +498,7 @@ function Visual.UpdateESP(force)
     for obj, typeName in pairs(Visual.ESP.trackedObjects) do
         if obj and obj.Parent then
             local setting = Visual.ESP.settings[typeName]
-            if setting and setting.Enabled then
+            if setting and setting.Enabled and (typeName ~= "Pallets" or obj:GetAttribute("PalletState") ~= "Broken") then
                 if typeName == "Generators" then
                     local progress = Visual.GetGeneratorProgress(obj)
                     Visual.EnsureGeneratorESP(obj, progress, setting.Color)
@@ -1102,57 +1109,38 @@ end
 
 function Visual.ToggleNoFog(enabled)
     Visual.Effects.noFogEnabled = enabled
-    
-    if enabled then
-        pcall(function()
-            local lighting = Liquidation.Services.Lighting
-            
-            for _, effect in ipairs(lighting:GetChildren()) do
-                if effect:IsA("Atmosphere") or 
-                   effect.Name:lower():find("fog") or 
-                   effect.Name:lower():find("bloom") or
-                   effect.Name:lower():find("blur") or
-                   effect.Name:lower():find("color") then
-                    effect:Destroy()
-                end
+    Liquidation.States.noFogEnabled = enabled
+    Liquidation.safeDisconnect(Visual.Connections.NoFog)
+    Visual.Connections.NoFog = nil
+    local lighting = Liquidation.Services.Lighting
+    if not enabled then
+        local saved = Visual.Effects.fogSnapshot
+        if saved then
+            lighting.FogStart, lighting.FogEnd = saved.Start, saved.Finish
+            for object, properties in pairs(saved.Atmospheres) do
+                if object.Parent then for key, value in pairs(properties) do object[key] = value end end
             end
-            
-            local map = Liquidation.Services.Workspace:FindFirstChild("Map")
-            if map then
-                for _, obj in ipairs(map:GetDescendants()) do
-                    if obj:IsA("Atmosphere") or 
-                       obj:IsA("BloomEffect") or 
-                       obj:IsA("BlurEffect") or 
-                       obj:IsA("ColorCorrectionEffect") or
-                       obj.Name:lower():find("fog") then
-                        obj:Destroy()
-                    end
-                end
+        end
+        Visual.Effects.fogSnapshot = nil
+        return
+    end
+    local saved = Visual.Effects.fogSnapshot or {Start = lighting.FogStart, Finish = lighting.FogEnd, Atmospheres = {}}
+    Visual.Effects.fogSnapshot = saved
+    local function apply()
+        lighting.FogStart, lighting.FogEnd = 0, 1000000
+        for _, object in ipairs(lighting:GetChildren()) do
+            if object:IsA("Atmosphere") then
+                if not saved.Atmospheres[object] then saved.Atmospheres[object] = {Density = object.Density, Haze = object.Haze, Glare = object.Glare} end
+                object.Density, object.Haze, object.Glare = 0, 0, 0
             end
-            
-            lighting.FogEnd = 10000000
-            lighting.FogStart = 0
-            lighting.FogDensity = 0
-            lighting.GlobalShadows = true
-            
-            if Visual.ESP.espConnections.noFog then
-                Visual.ESP.espConnections.noFog:Disconnect()
-            end
-            
-            Visual.ESP.espConnections.noFog = Liquidation.Services.RunService.Heartbeat:Connect(function()
-                if Visual.Effects.noFogEnabled then
-                    lighting.FogEnd = 10000000
-                    lighting.FogStart = 0
-                    lighting.FogDensity = 0
-                end
-            end)
-        end)
-    else
-        if Visual.ESP.espConnections.noFog then
-            Visual.ESP.espConnections.noFog:Disconnect()
-            Visual.ESP.espConnections.noFog = nil
         end
     end
+    apply()
+    local elapsed = 0
+    Visual.Connections.NoFog = Liquidation.Services.RunService.Heartbeat:Connect(function(dt)
+        elapsed += dt
+        if elapsed >= 0.25 then elapsed = 0; apply() end
+    end)
 end
 
 function Visual.ToggleFullBright(enabled)
@@ -1192,6 +1180,14 @@ function Visual.SetTime(TimeVal)
         Liquidation.Services.Lighting.ClockTime = TimeVal;
     end;
 end;
+
+function Visual.Cleanup()
+    Visual.ToggleNoFog(false)
+    Visual.StopESP()
+    Visual.StopAdvancedESP()
+    for _, connection in pairs(Visual.Connections) do Liquidation.safeDisconnect(connection) end
+    table.clear(Visual.Connections)
+end
 
 --// Exports //--
 Visual.Effects.currentTimeValue = 14;
