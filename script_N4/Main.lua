@@ -511,6 +511,18 @@ local MovementGroup = SurvivorTab:CreateGroup({
     Column = `Left`,
 });
 
+local InvisibilityToggle
+InvisibilityToggle = MovementGroup:CreateToggle({
+    Name = `Invisibility (Test)`,
+    Default = false,
+    Callback = function(value)
+        if value then SurvivorModule.Invisibility.Enable() else SurvivorModule.Invisibility.Disable() end
+    end,
+});
+SurvivorModule.Invisibility.OnChanged = function(value)
+    if InvisibilityToggle and InvisibilityToggle.Value ~= value then InvisibilityToggle:Set(value) end
+end
+
 MovementGroup:CreateToggle({
     Name = `No Slowdown`,
     Default = false,
@@ -1558,6 +1570,8 @@ AdvancedESPGroup:CreateToggle({
         VisualModule.AdvancedESP.settings.bones = Value;
     end,
 });
+
+SurvivorModule.Advanced.CreateUI(Window)
 
 Liquidation.Window = Window
 Liquidation.Library = LiquidationLib

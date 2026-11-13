@@ -32,6 +32,166 @@ local function setupTeamListener(callback)
 end
 
 
+local Invisibility = {Active = false}
+do
+    local player, run, input = Liquidation.Player, Liquidation.Services.RunService, Liquidation.Services.UserInputService
+    local session, starting = nil, false
+    local binding = "LiquidationSurvivorClone_" .. player.UserId
+    local function changed(value)
+        Invisibility.Active = value
+        Liquidation.States.InvisibilityEnabled = value
+        if Invisibility.OnChanged then pcall(Invisibility.OnChanged, value) end
+    end
+    local function stop(restore)
+        local s = session
+        session = nil
+        run:UnbindFromRenderStep(binding)
+        if s then
+            for _, c in ipairs(s.connections) do c:Disconnect() end
+            if s.controls.moveFunction == s.move then s.controls.moveFunction = s.oldMove end
+            if s.original.Parent then
+                if restore and player.Character == s.original and s.root.Parent and s.cloneRoot.Parent and s.humanoid.Health > 0 then
+                    s.root.CFrame = s.cloneRoot.CFrame
+                    s.root.AssemblyLinearVelocity = s.cloneRoot.AssemblyLinearVelocity
+                    s.root.AssemblyAngularVelocity = Vector3.zero
+                end
+                s.humanoid.AutoRotate = s.autoRotate
+                for part, properties in pairs(s.parts) do
+                    if part.Parent then part.CanCollide = properties[1]; part.LocalTransparencyModifier = properties[2] end
+                end
+            end
+            local camera = workspace.CurrentCamera
+            if camera and camera.CameraSubject == s.cloneHumanoid then
+                camera.CameraSubject = player.Character == s.original and s.humanoid or (player.Character and player.Character:FindFirstChildOfClass("Humanoid"))
+            end
+            s.clone:Destroy()
+        end
+        changed(false)
+    end
+    function Invisibility.Disable() stop(true) end
+    function Invisibility.Enable()
+        if session or starting then return session ~= nil end
+        starting = true
+        local ok, err = pcall(function()
+            assert(isSurvivorTeam(), "Survivor only")
+            assert(not (Liquidation.Motion and Liquidation.Motion.Fly), "Disable Fly first")
+            local original = player.Character
+            local humanoid = original and original:FindFirstChildOfClass("Humanoid")
+            local root = original and original:FindFirstChild("HumanoidRootPart")
+            assert(humanoid and root and humanoid.Health > 0 and not root.Anchored, "Character unavailable")
+            for _, name in ipairs({"IsCarried", "IsHooked", "IsTrapped", "IsStunned", "Knocked"}) do assert(not original:GetAttribute(name), "Character is busy") end
+            local floor = workspace.FallenPartsDestroyHeight
+            assert(root.Position.Y - 80 > floor + 25, "Not enough space above the destruction boundary")
+            local scripts = player:FindFirstChild("PlayerScripts")
+            local module = scripts and scripts:FindFirstChild("PlayerModule")
+            assert(module, "Player controls unavailable")
+            local controls = require(module):GetControls()
+            assert(type(controls.moveFunction) == "function", "Player movement unavailable")
+            local archivable = original.Archivable
+            original.Archivable = true
+            local cloned, clone = pcall(original.Clone, original)
+            original.Archivable = archivable
+            assert(cloned and clone, "Cannot clone character")
+            local cloneHumanoid = clone:FindFirstChildOfClass("Humanoid")
+            local cloneRoot = clone:FindFirstChild("HumanoidRootPart")
+            if not cloneHumanoid or not cloneRoot then clone:Destroy(); error("Clone rig unavailable") end
+            session = {original = original, humanoid = humanoid, root = root, clone = clone, cloneHumanoid = cloneHumanoid, cloneRoot = cloneRoot, controls = controls, oldMove = controls.moveFunction, parts = {}, connections = {}, autoRotate = humanoid.AutoRotate, tracks = {}, animations = {}}
+            local s = session
+            clone.Name = "LiquidationSurvivorClone"
+            for _, object in ipairs(clone:GetDescendants()) do
+                if object:IsA("LuaSourceContainer") or object:IsA("Tool") or object:IsA("Sound") or object:IsA("BillboardGui") or object:IsA("Highlight") or object:IsA("BodyMover") or object:IsA("VectorForce") or object:IsA("LinearVelocity") or object:IsA("AlignPosition") or object:IsA("AlignOrientation") then
+                    object:Destroy()
+                elseif object:IsA("BasePart") then
+                    object.Anchored = false
+                    object.CanTouch = false
+                    object.CanQuery = false
+                    object.LocalTransparencyModifier = 0
+                    object.Transparency = math.max(object.Transparency, 0.55)
+                elseif object:IsA("Decal") then object.Transparency = math.max(object.Transparency, 0.55)
+                elseif object:IsA("ParticleEmitter") or object:IsA("Trail") or object:IsA("Beam") then object.Enabled = false end
+            end
+            cloneHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+            cloneHumanoid.BreakJointsOnDeath = false
+            clone:PivotTo(original:GetPivot())
+            clone.Parent = workspace
+            cloneRoot.AssemblyLinearVelocity = root.AssemblyLinearVelocity
+            local animator = cloneHumanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", cloneHumanoid)
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do track:Stop(0) end
+            for _, object in ipairs(original:GetDescendants()) do
+                if object:IsA("BasePart") then s.parts[object] = {object.CanCollide, object.LocalTransparencyModifier}; object.CanCollide = false; object.LocalTransparencyModifier = 1
+                elseif object:IsA("Animation") then
+                    local name = (object.Name .. " " .. object.Parent.Name):lower()
+                    for _, kind in ipairs({"idle", "walk", "run", "jump", "fall"}) do
+                        if name:find(kind, 1, true) and not s.animations[kind] then
+                            local loaded, track = pcall(animator.LoadAnimation, animator, object)
+                            if loaded then track.Looped = kind ~= "jump"; s.animations[kind] = track end
+                        end
+                    end
+                end
+            end
+            local sourceAnimator = humanoid:FindFirstChildOfClass("Animator")
+            local function mirror(source)
+                if session ~= s or not source.Animation or s.tracks[source] then return end
+                local loaded, track = pcall(animator.LoadAnimation, animator, source.Animation)
+                if loaded then
+                    s.tracks[source] = track
+                    track.Priority = source.Priority; track.Looped = source.Looped
+                    track:Play(0.05, math.max(source.WeightCurrent, 0.01), source.Speed)
+                    pcall(function() track.TimePosition = source.TimePosition end)
+                end
+            end
+            if sourceAnimator then
+                for _, track in ipairs(sourceAnimator:GetPlayingAnimationTracks()) do mirror(track) end
+                table.insert(s.connections, sourceAnimator.AnimationPlayed:Connect(mirror))
+            end
+            s.move = function(_, direction, relative)
+                if session == s then cloneHumanoid:Move(direction, relative) end
+            end
+            controls.moveFunction = s.move
+            humanoid.AutoRotate = false
+            table.insert(s.connections, input.JumpRequest:Connect(function() if session == s then cloneHumanoid.Jump = true end end))
+            table.insert(s.connections, player.CharacterRemoving:Connect(function(character) if character == original then stop(false) end end))
+            table.insert(s.connections, player:GetPropertyChangedSignal("Team"):Connect(function() if not isSurvivorTeam() then stop(true) end end))
+            table.insert(s.connections, humanoid.Died:Connect(function() stop(false) end))
+            table.insert(s.connections, cloneHumanoid.Died:Connect(function() stop(true) end))
+            table.insert(s.connections, run.PreSimulation:Connect(function()
+                if session ~= s then return end
+                if player.Character ~= original or not original.Parent or not clone.Parent or humanoid.Health <= 0 then stop(false); return end
+                if not isSurvivorTeam() or cloneRoot.Position.Y - 80 <= workspace.FallenPartsDestroyHeight + 25 or Liquidation.Motion and Liquidation.Motion.Fly then stop(true); return end
+                for _, name in ipairs({"IsCarried", "IsHooked", "IsTrapped", "IsStunned", "Knocked"}) do if original:GetAttribute(name) then stop(false); return end end
+                cloneHumanoid.WalkSpeed = humanoid.WalkSpeed
+                cloneHumanoid.UseJumpPower = humanoid.UseJumpPower
+                cloneHumanoid.JumpPower = humanoid.JumpPower
+                cloneHumanoid.JumpHeight = humanoid.JumpHeight
+                if humanoid.Jump then cloneHumanoid.Jump = true; humanoid.Jump = false end
+                root.CFrame = cloneRoot.CFrame + Vector3.new(0, -80, 0)
+                root.AssemblyLinearVelocity = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
+                local state = cloneHumanoid:GetState()
+                local kind = state == Enum.HumanoidStateType.Jumping and "jump" or state == Enum.HumanoidStateType.Freefall and "fall" or cloneHumanoid.MoveDirection.Magnitude > 0.05 and "walk" or "idle"
+                local locomotion = s.animations[kind] or kind == "walk" and s.animations.run
+                for _, track in pairs(s.animations) do
+                    if track == locomotion then if not track.IsPlaying then track:Play(0.12) end elseif track.IsPlaying then track:Stop(0.12) end
+                end
+                for source, track in pairs(s.tracks) do
+                    if not source.IsPlaying then track:Stop(0.08); track:Destroy(); s.tracks[source] = nil
+                    else track:AdjustSpeed(source.Speed); track:AdjustWeight(source.Priority.Value <= Enum.AnimationPriority.Movement.Value and 0 or source.WeightCurrent, 0.08) end
+                end
+            end))
+            run:BindToRenderStep(binding, Enum.RenderPriority.Camera.Value - 2, function()
+                if session == s and workspace.CurrentCamera then workspace.CurrentCamera.CameraSubject = cloneHumanoid end
+            end)
+            if workspace.CurrentCamera then workspace.CurrentCamera.CameraSubject = cloneHumanoid end
+            root.CFrame = cloneRoot.CFrame + Vector3.new(0, -80, 0)
+            root.AssemblyLinearVelocity = Vector3.zero
+            changed(true)
+        end)
+        starting = false
+        if not ok then stop(true); warn("[Liquidation] Invisibility: " .. tostring(err)) end
+        return ok
+    end
+end
+
 local Crosshair = (function()
     local enabled = false
     local rainbowEnabled = false
@@ -3118,7 +3278,8 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
 end
 
 function Survivor.Cleanup()
-
+    if Survivor.Advanced then Survivor.Advanced.Cleanup() end
+    Invisibility.Disable()
     Crosshair.Disable()
     AutoVictory.Disable()
     AutoVictoryV2.Disable()
@@ -3149,6 +3310,7 @@ function Survivor.Cleanup()
 end
 
 --// Exports //--
+Survivor.Invisibility = Invisibility;
 Survivor.Crosshair = Crosshair;
 Survivor.AutoVictory = AutoVictory;
 Survivor.AutoVictoryV2 = AutoVictoryV2;
@@ -3174,5 +3336,433 @@ Survivor.StartInstantHeal = StartInstantHeal;
 Survivor.StopInstantHeal = StopInstantHeal;
 Survivor.StartSilentHeal = StartSilentHeal;
 Survivor.StopSilentHeal = StopSilentHeal;
+
+Survivor.Advanced = (function()
+local A = {Flags = {}, Range = 4, ActionScale = 0.35, DodgeDistance = 6, DodgeLead = 0.3, WarningRange = 90, AttackRange = 6}
+local player, run, rs = Liquidation.Player, Liquidation.Services.RunService, Liquidation.Services.ReplicatedStorage
+local collection = game:GetService("CollectionService")
+local connections, patches, threats, trapVisuals = {}, {}, {}, {}
+local rootFolder, hud, message, sound, destroyed
+local nextScan, nextVisual, nextDodge, nextReset, nextAttack = 0, 0, 0, 0, 0
+local modules, lookup, sequence = {}, {}, 0
+local kinds = {Spear = Color3.fromRGB(240, 110, 255), Chain = Color3.fromRGB(255, 170, 80), Flask = Color3.fromRGB(100, 245, 160)}
+local function finite(n) return type(n) == "number" and n == n and math.abs(n) < 1e8 end
+local function vector(v) return typeof(v) == "Vector3" and finite(v.X) and finite(v.Y) and finite(v.Z) end
+local function characterRoot()
+local c = player.Character
+local h = c and c:FindFirstChildOfClass("Humanoid")
+local r = c and c:FindFirstChild("HumanoidRootPart")
+if h and r and h.Health > 0 then return c, h, r end
+end
+local function survivor(c)
+return c and (c:HasTag("Survivor") or player.Team and player.Team.Name:lower():find("survivor", 1, true))
+end
+local function busy(c, h, r)
+if not c or not h or not r or r.Anchored or h.Sit or h.PlatformStand then return true end
+for _, key in ipairs({"IsCarried", "IsHooked", "Knocked", "Trapped", "IsStunned", "Ragdolled", "Chained", "ChainLatched", "Immobile"}) do
+if c:GetAttribute(key) == true then return true end
+end
+local env = getgenv and getgenv() or _G
+local standalone = env.LiquidationStandaloneInvisibility
+if Invisibility.Active or type(standalone) == "table" and standalone.Active then return true end
+if Liquidation.Motion and Liquidation.Motion.Fly then return true end
+return Liquidation.Services.UserInputService:GetFocusedTextBox() ~= nil
+end
+local function findModule(path)
+if modules[path] then return modules[path] end
+local object = rs:FindFirstChild("Modules")
+for name in path:gmatch("[^.]+") do object = object and object:FindFirstChild(name) end
+if not object or not object:IsA("ModuleScript") then return end
+local ok, value = pcall(require, object)
+if ok and type(value) == "table" then modules[path] = value; return value end
+end
+local specs = {
+SurvivorNoCD = {"Survivors.SurvivorConfig", {MOUSE_COOLDOWN = 0.02, SPACE_COOLDOWN = 0.02, GIFT_DROP_COOLDOWN = 0.02, UNHOOK_COOLDOWN = 0.02}},
+KillerNoCD = {"Killers.KillerConfig", {DEBOUNCE_TIME = 0.02, CARRY_COOLDOWN_TIME = 0.05}},
+FastUnhook = {"Survivors.SurvivorConfig", {UNHOOK_DURATION = 0.2, SELF_UNHOOK_HOLD_DURATION = 0.1}},
+FastPrompts = {"Survivors.SurvivorConfig", {PROXIMITY_INTERVAL = 0.025, STATIONARY_TIME_THRESHOLD = 0.01}},
+ExtendedInteract = {"Survivors.SurvivorConfig", {DETECTION_RADIUS = "Range", GENERATOR_DETECTION_RADIUS = "Range", TRAVERSAL_DETECTION_RADIUS = "Range"}},
+ExtendedKillerInteract = {"Killers.KillerConfig", {DETECTION_RADIUS = "Range", GENERATOR_DETECTION_RADIUS = "Range", SURVIVOR_CARRY_RADIUS = "Range"}},
+FastKillerActions = {"Killers.KillerConfig", {PALLET_BREAK_DURATION = "ActionScale", GEN_BREAK_DURATION = "ActionScale", VAULT_DURATION = "ActionScale"}}
+}
+local function restorePatch(key)
+local p = patches[key]
+if not p then return end
+for field, saved in pairs(p.Fields) do
+if p.Module[field] == saved.Applied then p.Module[field] = saved.Original end
+end
+patches[key] = nil
+end
+local function applyPatch(key)
+local spec = specs[key]
+if not spec or not A.Flags[key] then restorePatch(key); return end
+local m = findModule(spec[1])
+if not m then return end
+local p = patches[key] or {Module = m, Fields = {}}
+patches[key] = p
+for field, target in pairs(spec[2]) do
+if type(m[field]) == "number" then
+local saved = p.Fields[field] or {Original = m[field]}
+if type(target) == "string" then
+target = target == "ActionScale" and math.max(0.05, saved.Original * A.ActionScale) or A[target]
+end
+saved.Applied = target
+p.Fields[field] = saved
+m[field] = target
+end
+end
+end
+local function visuals()
+if rootFolder then return end
+rootFolder = Instance.new("Folder")
+rootFolder.Name = "LiquidationThreatVisuals"
+rootFolder.Parent = workspace
+end
+local function makeHUD()
+if hud then return end
+hud = Instance.new("ScreenGui")
+hud.Name, hud.ResetOnSpawn, hud.DisplayOrder = "LiquidationThreatWarning", false, 120
+hud.Parent = player:FindFirstChildOfClass("PlayerGui")
+message = Instance.new("TextLabel")
+message.AnchorPoint, message.Position = Vector2.new(0.5, 0), UDim2.fromScale(0.5, 0.14)
+message.Size = UDim2.new(0.84, 0, 0, 64)
+message.BackgroundTransparency, message.TextColor3 = 1, Color3.fromRGB(255, 135, 135)
+message.Font, message.TextSize, message.TextWrapped = Enum.Font.GothamBold, 18, true
+message.TextStrokeTransparency, message.Visible = 0.45, false
+message.Parent = hud
+sound = Instance.new("Sound")
+sound.SoundId, sound.Volume, sound.Parent = "rbxasset://sounds/electronicpingshort.wav", 0.5, hud
+end
+local function removeThreat(key)
+local t = threats[key]
+if t and t.Lines then for _, line in ipairs(t.Lines) do line:Destroy() end end
+threats[key] = nil
+end
+local function clearThreats()
+for key in pairs(threats) do removeThreat(key) end
+table.clear(lookup)
+if message then message.Visible = false end
+end
+local function sample(t, age)
+if t.Points then
+local distance = math.max(age, 0) * 70
+for i = 2, #t.Points do
+local finish = t.Distances[i]
+if distance <= finish then
+local length = finish - t.Distances[i - 1]
+return t.Points[i - 1]:Lerp(t.Points[i], length > 0 and (distance - t.Distances[i - 1]) / length or 0)
+end
+end
+return t.Points[#t.Points]
+end
+return t.Origin + t.Velocity * age + t.Gravity * (age * age * 0.5)
+end
+local function addThreat(kind, id, data, source)
+if type(data) ~= "table" or source == player or source == player.Character then return end
+local now = workspace:GetServerTimeNow()
+local t = {Kind = kind, Source = source, Start = data.LaunchTime or data.StartedAt, Gravity = Vector3.zero}
+if not finite(t.Start) or t.Start > now + 0.5 then return end
+if kind == "Flask" then
+if type(data.Points) ~= "table" or #data.Points < 2 or #data.Points > 160 then return end
+t.Points, t.Distances = {}, {0}
+for i, point in ipairs(data.Points) do
+if not vector(point) then return end
+t.Points[i] = point
+if i > 1 then t.Distances[i] = t.Distances[i - 1] + (point - t.Points[i - 1]).Magnitude end
+end
+t.Life = t.Distances[#t.Points] / 70
+else
+if not vector(data.Origin) or not vector(data.Direction) or data.Direction.Magnitude < 0.001 then return end
+local speed = kind == "Chain" and 140 or data.Speed
+if not finite(speed) or speed < 1 or speed > 500 then return end
+t.Origin, t.Velocity = data.Origin, data.Direction.Unit * speed
+t.Gravity = kind == "Spear" and Vector3.new(0, -98.1, 0) or Vector3.zero
+t.Life = kind == "Spear" and 4 or 50 / 140
+end
+if t.Life <= 0 or now - t.Start >= t.Life then return end
+local key = kind .. ":" .. tostring(id)
+removeThreat(key)
+local count = 0
+for _ in pairs(threats) do count += 1 end
+if count >= 24 then return end
+threats[key] = t
+end
+local function nearestSegment(a, b)
+local d = b - a
+local alpha = d:Dot(d) > 1e-8 and math.clamp(-a:Dot(d) / d:Dot(d), 0, 1) or 0
+return (a + d * alpha).Magnitude, alpha
+end
+local function prediction(t, age, position, velocity)
+local remaining = math.min(0.8, t.Life - age)
+if remaining <= 0 then return end
+local previous = sample(t, age) - position
+local bestDistance, bestTime = math.huge, 0
+for i = 1, 24 do
+local elapsed = remaining * i / 24
+local current = sample(t, age + elapsed) - position - velocity * elapsed
+local d, alpha = nearestSegment(previous, current)
+if d < bestDistance then bestDistance, bestTime = d, remaining * (i - 1 + alpha) / 24 end
+previous = current
+end
+return bestDistance, bestTime
+end
+local function blockedByWorld(t, age, seconds, character)
+if t.Kind == "Flask" then return false end
+local params = RaycastParams.new()
+params.FilterType, params.RespectCanCollide = Enum.RaycastFilterType.Exclude, true
+local excluded = {character, rootFolder}
+if typeof(t.Source) == "Instance" then excluded[#excluded + 1] = t.Source end
+params.FilterDescendantsInstances = excluded
+local previous = sample(t, age)
+for i = 1, 4 do
+local point = sample(t, age + seconds * i / 4)
+if workspace:Raycast(previous, point - previous, params) then return true end
+previous = point
+end
+return false
+end
+local function dodge(t, age, c, h, root)
+if busy(c, h, root) or os.clock() < nextDodge then return false end
+local v = sample(t, age + 0.03) - sample(t, age)
+local sideways = Vector3.new(-v.Z, 0, v.X)
+if sideways.Magnitude < 0.01 then return false end
+sideways = sideways.Unit
+local params = RaycastParams.new()
+params.FilterType, params.RespectCanCollide = Enum.RaycastFilterType.Exclude, true
+params.FilterDescendantsInstances = {c, rootFolder}
+local chosen, score
+for _, sign in ipairs({1, -1}) do
+local offset = sideways * sign * A.DodgeDistance
+local wall = workspace:Blockcast(root.CFrame, Vector3.new(3, 4, 3), offset, params)
+local target = root.Position + offset
+local floor = workspace:Raycast(target + Vector3.new(0, 1, 0), Vector3.new(0, -9, 0), params)
+if not wall and floor and floor.Normal.Y >= 0.55 and math.abs((root.Position.Y - h.HipHeight - root.Size.Y * 0.5) - floor.Position.Y) <= 6 then
+local separation = prediction(t, age, target, Vector3.zero)
+if separation and separation > 4 and (not score or separation > score) then chosen, score = offset, separation end
+end
+end
+if not chosen then return false end
+root.CFrame = root.CFrame + chosen
+root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+nextDodge, t.Dodged = os.clock() + 0.65, true
+return true
+end
+local function drawPath(t, age)
+if not A.Flags.Trajectories then
+if t.Lines then for _, line in ipairs(t.Lines) do line:Destroy() end; t.Lines = nil end
+return
+end
+visuals()
+t.Lines = t.Lines or {}
+local duration = math.min(0.8, t.Life - age)
+for i = 1, 16 do
+local line = t.Lines[i]
+if not line then
+line = Instance.new("Part")
+line.Name, line.Anchored, line.CanCollide, line.CanTouch, line.CanQuery = "ThreatPath", true, false, false, false
+line.Material, line.Color, line.Transparency = Enum.Material.Neon, kinds[t.Kind], 0.25
+line.Parent, t.Lines[i] = rootFolder, line
+end
+local a, b = sample(t, age + duration * (i - 1) / 16), sample(t, age + duration * i / 16)
+local length = (b - a).Magnitude
+line.Transparency = length > 0.001 and 0.25 or 1
+if length > 0.001 then line.Size = Vector3.new(0.09, 0.09, length); line.CFrame = CFrame.lookAt((a + b) * 0.5, b) end
+end
+end
+local function updateTraps(c, root)
+local nearest = math.huge
+local live = {}
+for _, trap in ipairs(collection:GetTagged("BearTrap")) do
+if trap:IsDescendantOf(workspace) then
+local p = trap:IsA("BasePart") and trap.Position or trap:IsA("Model") and trap:GetPivot().Position
+if p then
+live[trap] = true
+local d = (p - root.Position).Magnitude
+nearest = math.min(nearest, d)
+if A.Flags.TrapESP and not trapVisuals[trap] then
+visuals()
+local highlight = Instance.new("Highlight")
+highlight.Name, highlight.Adornee = "BearTrapWarning", trap
+highlight.FillColor, highlight.OutlineColor = Color3.fromRGB(255, 110, 60), Color3.fromRGB(255, 225, 160)
+highlight.FillTransparency, highlight.DepthMode = 0.5, Enum.HighlightDepthMode.AlwaysOnTop
+highlight.Parent, trapVisuals[trap] = rootFolder, highlight
+end
+end
+end
+end
+for trap, highlight in pairs(trapVisuals) do
+if not live[trap] or not A.Flags.TrapESP then highlight:Destroy(); trapVisuals[trap] = nil end
+end
+A.NearTrap = A.Flags.TrapWarning and survivor(c) and nearest <= 12 and nearest or nil
+end
+local function updateAttack(c, h, root)
+if not A.Flags.AutoAttack or survivor(c) or busy(c, h, root) then return end
+if not c:HasTag("Killer") and not (player.Team and player.Team.Name:lower():find("killer", 1, true)) then return end
+local nearest, distance = nil, A.AttackRange
+for _, other in ipairs(Liquidation.Services.Players:GetPlayers()) do
+local target = other.Character
+local targetRoot = target and target:FindFirstChild("HumanoidRootPart")
+local targetHumanoid = target and target:FindFirstChildOfClass("Humanoid")
+if other ~= player and targetRoot and targetHumanoid and targetHumanoid.Health > 20 and target:HasTag("Survivor") and not target:GetAttribute("IsHooked") and not target:GetAttribute("IsCarried") then
+local delta = targetRoot.Position - root.Position
+if delta.Magnitude < distance and root.CFrame.LookVector:Dot(delta.Unit) > 0.35 then
+nearest, distance = target, delta.Magnitude
+end
+end
+end
+if not nearest then return end
+local params = RaycastParams.new()
+params.FilterType = Enum.RaycastFilterType.Exclude
+params.FilterDescendantsInstances = {c, rootFolder}
+local hit = workspace:Raycast(root.Position, nearest.HumanoidRootPart.Position - root.Position, params)
+if not hit or hit.Instance:IsDescendantOf(nearest) then Liquidation.NativeAttack() end
+end
+local function hasThreatFeatures()
+return A.Flags.SpearWarning or A.Flags.SpearDodge or A.Flags.ChainWarning or A.Flags.ChainDodge or A.Flags.FlaskWarning or A.Flags.FlaskDodge or A.Flags.Trajectories
+end
+function A.Set(key, value)
+if destroyed then return end
+A.Flags[key] = value == true
+if specs[key] then applyPatch(key) end
+if not hasThreatFeatures() then clearThreats() end
+if key == "TrapESP" and not value then for trap, highlight in pairs(trapVisuals) do highlight:Destroy(); trapVisuals[trap] = nil end end
+end
+local function remote(path, callback)
+local node = rs:FindFirstChild("Remotes")
+for name in path:gmatch("[^.]+") do node = node and node:FindFirstChild(name) end
+if node and node:IsA("RemoteEvent") then connections[#connections + 1] = node.OnClientEvent:Connect(callback) end
+end
+remote("Killers.Veil.SpearState", function(action, data)
+if not hasThreatFeatures() or type(data) ~= "table" then return end
+if action == "launch" and data.Id ~= nil then addThreat("Spear", data.Id, data, data.Source)
+elseif action == "stop" and data.Id ~= nil then removeThreat("Spear:" .. tostring(data.Id)) end
+end)
+remote("Killers.Butcher.ChainState", function(owner, points, a, b, target, d, e, phase, data)
+if not hasThreatFeatures() then return end
+local key = tostring(owner)
+if phase == "flying" and type(data) == "table" then
+if lookup[key] ~= data.LaunchTime then
+removeThreat("Chain:" .. key)
+lookup[key] = data.LaunchTime
+addThreat("Chain", key, data, owner)
+end
+else removeThreat("Chain:" .. key); lookup[key] = nil end
+end)
+remote("Killers.Butcher.ChainClear", function(owner)
+removeThreat("Chain:" .. tostring(owner)); lookup[tostring(owner)] = nil
+end)
+remote("Killers.Cure.VisualizeFlask", function(action, data)
+if not hasThreatFeatures() or type(data) ~= "table" then return end
+if action == "launch" then
+local id = tostring(data.Owner) .. ":" .. tostring(data.Source) .. ":" .. tostring(data.Sequence)
+addThreat("Flask", id, data, data.Source)
+end
+end)
+connections[#connections + 1] = player.CharacterRemoving:Connect(function() clearThreats(); A.NearTrap = nil end)
+local lastSound, wasWarning = 0, false
+connections[#connections + 1] = run.Heartbeat:Connect(function()
+if destroyed then return end
+local now = os.clock()
+local c, h, root = characterRoot()
+if not c then if message then message.Visible = false end; return end
+if now >= nextScan then
+nextScan = now + 0.2
+if A.Flags.TrapESP or A.Flags.TrapWarning then updateTraps(c, root) else A.NearTrap = nil end
+end
+if A.Flags.LocalNoCD and now >= nextReset then
+nextReset = now + 0.25
+if not busy(c, h, root) then
+local n = player:GetAttribute("BaseplateCooldownReset")
+player:SetAttribute("BaseplateCooldownReset", (finite(n) and n or 0) + 1)
+end
+end
+if A.Flags.AutoAttack and now >= nextAttack then nextAttack = now + 0.1; updateAttack(c, h, root) end
+if not hasThreatFeatures() and not A.NearTrap then if message then message.Visible = false end; wasWarning = false; return end
+local lines, best, bestAge, soonest = {}, nil, nil, math.huge
+local serverNow = workspace:GetServerTimeNow()
+local draw = now >= nextVisual
+if draw then nextVisual = now + 0.05 end
+local velocity = root.AssemblyLinearVelocity
+if velocity.Magnitude > 80 then velocity = Vector3.zero end
+for key, t in pairs(threats) do
+local age = math.max(0, serverNow - t.Start)
+if age >= t.Life then removeThreat(key)
+else
+if draw then drawPath(t, age) end
+if survivor(c) and (sample(t, age) - root.Position).Magnitude <= A.WarningRange then
+local distance, seconds = prediction(t, age, root.Position, velocity)
+if distance and distance <= 3.5 and not blockedByWorld(t, age, seconds, c) then
+if A.Flags[t.Kind .. "Warning"] then lines[#lines + 1] = string.format("%s INCOMING  %.0f ms", t.Kind:upper(), seconds * 1000) end
+if A.Flags[t.Kind .. "Dodge"] and not t.Dodged and seconds <= A.DodgeLead and seconds < soonest then best, bestAge, soonest = t, age, seconds end
+end
+end
+end
+end
+if best then dodge(best, bestAge, c, h, root) end
+if A.NearTrap then lines[#lines + 1] = string.format("BEAR TRAP  %.1f studs", A.NearTrap) end
+if #lines > 0 then
+makeHUD()
+message.Text, message.Visible = table.concat(lines, "  |  "), true
+if A.Flags.WarningSound and (not wasWarning or now - lastSound > 1.5) then sound:Play(); lastSound = now end
+wasWarning = true
+else if message then message.Visible = false end; wasWarning = false end
+end)
+function A.CreateUI(window)
+local survivorTab = window:CreateTab({Name = "Survivor"})
+local defense = survivorTab:CreateGroup({Name = "Projectile Defense", Column = "Left"})
+local rageTab = window:CreateTab({Name = "Rage"})
+local recovery = rageTab:CreateGroup({Name = "Recovery", Column = "Left"})
+local interactions = rageTab:CreateGroup({Name = "Interactions", Column = "Right"})
+local attack = rageTab:CreateGroup({Name = "Combat Assist", Column = "Left"})
+local visualTab = window:CreateTab({Name = "Visual"})
+local visualsGroup = visualTab:CreateGroup({Name = "Threat Visuals", Column = "Right"})
+local function toggle(group, key, title, description)
+group:CreateToggle({Name = title, Description = description, Default = false, Callback = function(value) A.Set(key, value) end})
+end
+local function slider(group, key, title, minimum, maximum, default, rounding)
+group:CreateSlider({Name = title, Min = minimum, Max = maximum, Default = default, Rounding = rounding or 0, Callback = function(value)
+A[key] = value
+for patch in pairs(patches) do applyPatch(patch) end
+end})
+end
+toggle(defense, "SpearWarning", "Veil Spear Warning", "Warns when a thrown spear is heading toward you.")
+toggle(defense, "SpearDodge", "[Experimental] Auto Dodge Veil Spear", "Sidesteps incoming spears when a clear landing is available.")
+toggle(defense, "ChainWarning", "Butcher Chain Warning", "Warns when a thrown chain is heading toward you.")
+toggle(defense, "ChainDodge", "[Experimental] Auto Dodge Chain", "Attempts a sidestep before an incoming chain reaches you.")
+toggle(defense, "FlaskWarning", "Cure Flask Warning", "Warns when a flying flask is heading toward you.")
+toggle(defense, "FlaskDodge", "[Experimental] Auto Dodge Flask", "Attempts to sidestep a flask in flight.")
+slider(defense, "DodgeDistance", "Dodge Distance", 4, 10, 6)
+slider(defense, "DodgeLead", "Dodge Lead Time", 0.1, 0.6, 0.3, 2)
+slider(defense, "WarningRange", "Warning Range", 20, 150, 90)
+toggle(recovery, "LocalNoCD", "[Experimental] No Cooldown (Client)", "Clears supported local item and ability recovery. Server cooldowns may remain.")
+toggle(recovery, "SurvivorNoCD", "No Survivor Input Cooldown", "Reduces delays between survivor interaction inputs.")
+toggle(recovery, "KillerNoCD", "[Experimental] No Killer Action Cooldown", "Reduces local action and carry delays.")
+toggle(interactions, "FastUnhook", "[Experimental] Fast Unhook", "Shortens local unhook preparation and rescue timing.")
+toggle(interactions, "FastPrompts", "Fast Interaction Prompts", "Refreshes nearby interaction prompts more frequently.")
+toggle(interactions, "ExtendedInteract", "[Experimental] Survivor Interaction Range", "Extends local detection of nearby interactions.")
+toggle(interactions, "ExtendedKillerInteract", "[Experimental] Killer Interaction Range", "Extends local detection of carry, pallet and generator interactions.")
+slider(interactions, "Range", "Interaction Range", 4, 12, 4)
+toggle(interactions, "FastKillerActions", "[Experimental] Fast Killer Actions", "Shortens local pallet, generator and vault action timing.")
+slider(interactions, "ActionScale", "Action Duration Multiplier", 0.1, 1, 0.35, 2)
+toggle(attack, "AutoAttack", "Auto Attack Nearby", "Uses a normal attack on a visible survivor in front of you.")
+slider(attack, "AttackRange", "Auto Attack Range", 3, 8, 6)
+toggle(visualsGroup, "Trajectories", "Projectile Trajectories", "Shows predicted spear, chain and flask flight paths.")
+toggle(visualsGroup, "TrapESP", "Bear Trap ESP", "Highlights bear traps through walls.")
+toggle(visualsGroup, "TrapWarning", "Bear Trap Warning", "Warns when a bear trap is close to you.")
+toggle(visualsGroup, "WarningSound", "Threat Warning Sound", "Plays a short alert with threat warnings.")
+end
+function A.Cleanup()
+destroyed = true
+for _, connection in ipairs(connections) do connection:Disconnect() end
+table.clear(connections)
+for key in pairs(patches) do restorePatch(key) end
+clearThreats()
+for trap, highlight in pairs(trapVisuals) do highlight:Destroy(); trapVisuals[trap] = nil end
+if hud then hud:Destroy(); hud, message, sound = nil, nil, nil end
+if rootFolder then rootFolder:Destroy(); rootFolder = nil end
+table.clear(A.Flags)
+end
+return A
+end)()
 
 return Survivor

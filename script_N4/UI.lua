@@ -6251,6 +6251,7 @@ Window = NexusUI:CreateWindow({
 Tabs = {
     Survivor = Window:AddTab({Title = "Survivor"}),
     Killer = Window:AddTab({Title = "Killer"}),
+    Rage = Window:AddTab({Title = "Rage"}),
     Movement = Window:AddTab({Title = "Movement"}),
     Fun = Window:AddTab({Title = "Fun"}),
     Visual = Window:AddTab({Title = "Visual"})
