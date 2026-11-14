@@ -183,8 +183,8 @@ end
 
 local function windowGradient()
     return bind(new("UIGradient", {Rotation = 35}), "Color", function()
-        local base = COLOR_WINDOW
-        return ColorSequence.new({ColorSequenceKeypoint.new(0, base:Lerp(COLOR_TEXT, 0.15)), ColorSequenceKeypoint.new(0.35, base:Lerp(COLOR_TEXT, 0.075)), ColorSequenceKeypoint.new(0.75, base:Lerp(COLOR_TEXT, 0.03)), ColorSequenceKeypoint.new(1, base)})
+        local base, light = Color3.fromRGB(9, 9, 12), Color3.fromRGB(236, 238, 243)
+        return ColorSequence.new({ColorSequenceKeypoint.new(0, base:Lerp(light, 0.15)), ColorSequenceKeypoint.new(0.35, base:Lerp(light, 0.075)), ColorSequenceKeypoint.new(0.75, base:Lerp(light, 0.03)), ColorSequenceKeypoint.new(1, base)})
     end)
 end
 
@@ -3956,7 +3956,7 @@ function NexusUI:CreateWindow(options)
     local innerClip = new("Frame", {Name = "InnerClip", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ClipsDescendants = true}, mainFrame)
     corner(innerClip, 12)
     createImageBackground(innerClip)
-    local shade = bind(new("Frame", {Name = "Shade", Size = UDim2.fromScale(1, 1), BorderSizePixel = 0, ZIndex = 2}, innerClip), "BackgroundColor3", function() return COLOR_WINDOW end)
+    local shade = bind(new("Frame", {Name = "Shade", Size = UDim2.fromScale(1, 1), BorderSizePixel = 0, ZIndex = 2}, innerClip), "BackgroundColor3", function() return Color3.fromRGB(9, 9, 12) end)
     corner(shade, 12)
     new("UIGradient", {Rotation = 90, Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(0.21, 1), NumberSequenceKeypoint.new(0.87, 1), NumberSequenceKeypoint.new(1, 0.5)})}, shade)
     bind(new("UIGradient", {Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.1, 0.3), NumberSequenceKeypoint.new(0.3, 0.25), NumberSequenceKeypoint.new(0.6, 1), NumberSequenceKeypoint.new(1, 1)})},
@@ -4719,8 +4719,8 @@ function NexusUI:CreateWindow(options)
         if sampleTime < 0.5 then return end
         local fps, ping = math.floor(frames / sampleTime + 0.5), 0
         pcall(function() ping = math.floor(LocalPlayer:GetNetworkPing() * 1000 + 0.5) end)
-        setFps(tostring(fps), fps >= 50 and GOOD or fps >= 30 and WARN or RAGE)
-        setPing(ping .. " MS", ping < 100 and GOOD or ping < 150 and WARN or RAGE)
+        setFps(tostring(fps), ACCENT)
+        setPing(ping .. " MS", ACCENT)
         frames, sampleTime = 0, 0
     end))
 
@@ -4797,7 +4797,7 @@ function NexusUI:CreateWindow(options)
         for i, tab in ipairs(tabs) do
             local selected = (i == index)
             if tab.underline then
-                tab.underline.Visible = selected
+                tab.underline.BackgroundTransparency, tab.underline.glow.ImageTransparency = selected and 0 or 1, selected and 0.3 or 1
             end
             if tab.label then bind(tab.label, "TextColor3", selected and textColor or dimColor) end
             tab.page.Visible = selected
@@ -4832,14 +4832,14 @@ function NexusUI:CreateWindow(options)
         local tabButton = bind(new("TextButton", {Size = UDim2.new(0, 0, 1, -8), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, Text = string.upper(tostring(tabData and tabData.Title or "Tab")), TextSize = 11, AutoButtonColor = false, LayoutOrder = #tabs + 1, ZIndex = 4}, tabStrip), "TextColor3", dimColor)
         new("UIPadding", {PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, right)}, tabButton)
         local tabLabel = tabButton
-        local tabUnderline = bind(new("Frame", {Size = UDim2.new(1, -8, 0, 2), Position = UDim2.new(0, 4, 1, 3), BorderSizePixel = 0, Visible = false, ZIndex = 4}, tabButton), "BackgroundColor3", accentColor)
+        local tabUnderline = bind(new("Frame", {Size = UDim2.new(1, -8, 0, 2), Position = UDim2.new(0, 4, 1, 3), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 4}, tabButton), "BackgroundColor3", accentColor)
         local tabGlow = icon("glow", 0, 12, accentColor, tabUnderline)
-        tabGlow.Size, tabGlow.ImageTransparency = UDim2.new(1, 0, 0, 12), 0.3
+        tabGlow.Size, tabGlow.ImageTransparency = UDim2.new(1, 0, 0, 12), 1
         if right > 7 then
             new("TextLabel", {Name = "TabBadge", Size = UDim2.fromOffset(26, 10), Position = UDim2.new(1, 2, 0.5, -11), BackgroundTransparency = 1, Text = tostring(tabData.Badge), TextColor3 = GOOD, FontFace = TEXT_FONT, TextSize = 7, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5}, tabButton)
         end
-        TrackGuiConnection(tabButton.MouseEnter:Connect(function() if not tabUnderline.Visible then bind(tabButton, "TextColor3", textColor) end end))
-        TrackGuiConnection(tabButton.MouseLeave:Connect(function() if not tabUnderline.Visible then bind(tabButton, "TextColor3", dimColor) end end))
+        TrackGuiConnection(tabButton.MouseEnter:Connect(function() if tabUnderline.BackgroundTransparency == 1 then bind(tabButton, "TextColor3", textColor) end end))
+        TrackGuiConnection(tabButton.MouseLeave:Connect(function() if tabUnderline.BackgroundTransparency == 1 then bind(tabButton, "TextColor3", dimColor) end end))
 
         local tabPage = Instance.new("CanvasGroup")
         tabPage.Size = UDim2.new(1, 0, 1, 0)
@@ -4900,7 +4900,7 @@ function NexusUI:CreateWindow(options)
         local function createSection(title, side, order)
             title = tostring(title)
             local accent = accentColor
-            local group = bind(new("Frame", {Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 0.64, BorderSizePixel = 0, LayoutOrder = order}), "BackgroundColor3", function() return COLOR_GROUP end)
+            local group = bind(new("Frame", {Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 0.64, BorderSizePixel = 0, LayoutOrder = order}), "BackgroundColor3", function() return Color3.fromRGB(9, 9, 12) end)
             group:SetAttribute("ColumnHome", side)
             corner(group, 9)
             stroke(group, 0.915)
