@@ -494,7 +494,8 @@ local env = getgenv and getgenv() or _G
 local key = "LiquidationTwistAimHookV1"
 local H = env[key]
 if type(H) ~= "table" then H = {}; env[key] = H end
-local module, replacement, original, handler, remote
+local module, replacement, original, handler, remote, updateConnection
+local snapshot, lastUpdate = nil, 0
 local function vector(v)
 return typeof(v) == "Vector3" and v.X == v.X and v.Y == v.Y and v.Z == v.Z and v.Magnitude < 1e7
 end
@@ -579,12 +580,19 @@ for _, other in ipairs(Liquidation.Services.Players:GetPlayers()) do inspect(oth
 for _, c in ipairs(collection:GetTagged("Killer")) do inspect(c) end
 return nearest
 end
-local function rewrite(args)
-if not enabled or not vector(args[2]) then return end
-local character, tool = player.Character, args[1]
-if not character or typeof(tool) ~= "Instance" or not tool:IsDescendantOf(character) then return end
+local function refresh()
+local character = player.Character
+if not enabled or not character then snapshot = nil; return end
+local owned = {}
+for _, object in ipairs(character:GetDescendants()) do owned[object] = true end
 local direction = aim(character)
-if direction then args[2] = direction; return true end
+snapshot = {Character = character, Owned = owned, Direction = direction, At = os.clock()}
+return direction
+end
+local function rewrite(args)
+local state = snapshot
+if not enabled or not state or state.Character ~= player.Character or os.clock() - state.At > 0.2 or not vector(args[2]) or not state.Owned[args[1]] then return end
+if state.Direction then args[2] = state.Direction; return true end
 end
 local function installHook()
 if H.Installed then return true end
@@ -592,9 +600,11 @@ if type(hookmetamethod) ~= "function" or type(getnamecallmethod) ~= "function" t
 local wrap = type(newcclosure) == "function" and newcclosure or function(f) return f end
 local nextCall
 local hook = wrap(function(self, ...)
-if getnamecallmethod() == "FireServer" and self == H.Remote and H.Handler then
+local method = getnamecallmethod()
+if method == "FireServer" and self == H.Remote and H.Handler then
 local args = table.pack(...)
 local ok, changed = pcall(H.Handler, args)
+if type(setnamecallmethod) == "function" then setnamecallmethod(method) end
 if ok and changed then return nextCall(self, table.unpack(args, 1, args.n)) end
 end
 return nextCall(self, ...)
@@ -606,6 +616,8 @@ return true
 end
 local function Disable()
 enabled, Liquidation.States.TwistSilentAimEnabled = false, false
+snapshot = nil
+if updateConnection then updateConnection:Disconnect(); updateConnection = nil end
 if H.Handler == handler then H.Handler, H.Remote = nil, nil end
 if module and module.aimDirection == replacement then module.aimDirection = original end
 module, replacement, original, handler, remote = nil, nil, nil, nil, nil
@@ -631,7 +643,7 @@ if ok and type(value) == "table" and type(value.aimDirection) == "function" then
 local nextAim = value.aimDirection
 local wrapper = function(character, frame)
 if enabled and character == player.Character then
-local ok, direction = pcall(aim, character)
+local ok, direction = pcall(refresh)
 if ok and direction then return direction end
 end
 return nextAim(character, frame)
@@ -639,6 +651,13 @@ end
 if pcall(function() value.aimDirection = wrapper end) then module, original, replacement = value, nextAim, wrapper end
 end
 end
+pcall(refresh)
+updateConnection = Liquidation.Services.RunService.Heartbeat:Connect(function()
+if not enabled or os.clock() - lastUpdate < 0.05 then return end
+lastUpdate = os.clock()
+local ok = pcall(refresh)
+if not ok then snapshot = nil end
+end)
 if not hooked and not module then Disable(); warn("[Liquidation] Twist Silent Aim: executor does not support an available aim hook"); return false end
 return true
 end
