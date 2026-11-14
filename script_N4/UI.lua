@@ -4834,7 +4834,7 @@ function NexusUI:CreateWindow(options)
         local tabLabel = tabButton
         local tabUnderline = bind(new("Frame", {Size = UDim2.new(1, -8, 0, 2), Position = UDim2.new(0, 4, 1, 3), BorderSizePixel = 0, Visible = false, ZIndex = 4}, tabButton), "BackgroundColor3", accentColor)
         local tabGlow = icon("glow", 0, 12, accentColor, tabUnderline)
-        tabGlow.Size, tabGlow.ImageTransparency = UDim2.new(1, 14, 0, 12), 0.3
+        tabGlow.Size, tabGlow.ImageTransparency = UDim2.new(1, 0, 0, 12), 0.3
         if right > 7 then
             new("TextLabel", {Name = "TabBadge", Size = UDim2.fromOffset(26, 10), Position = UDim2.new(1, 2, 0.5, -11), BackgroundTransparency = 1, Text = tostring(tabData.Badge), TextColor3 = GOOD, FontFace = TEXT_FONT, TextSize = 7, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5}, tabButton)
         end
@@ -4907,9 +4907,6 @@ function NexusUI:CreateWindow(options)
             new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder}, group)
             if title ~= "" then
                 local header = new("Frame", {Size = UDim2.new(1, 0, 0, 32), BackgroundTransparency = 1, ClipsDescendants = true, LayoutOrder = 0, ZIndex = 2}, group)
-                local tint = bind(new("Frame", {Size = UDim2.new(1, 0, 1, 9), BorderSizePixel = 0}, header), "BackgroundColor3", accent)
-                corner(tint, 9)
-                new("UIGradient", {Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.87), NumberSequenceKeypoint.new(0.58, 1), NumberSequenceKeypoint.new(1, 1)})}, tint)
                 local tick = bind(new("Frame", {Size = UDim2.fromOffset(3, 10), Position = UDim2.new(0, 12, 0.5, -5), BorderSizePixel = 0, ZIndex = 3}, header), "BackgroundColor3", accent)
                 corner(tick, 2)
                 icon("glow", 15, 22, accent, tick).ImageTransparency = 0.35
