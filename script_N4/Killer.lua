@@ -1744,141 +1744,195 @@ end)()
 -- SPEAR AIMBOT --
 
 local SpearAimBot = (function()
-    local enabled = false
-    local active = true
-    local isFiring = false
-    local oldNamecall = nil
-    local remote = nil
-    local teamListeners = {}
-    
-    local function GetClosestPlayer()
-        local closestPlayer = nil
-        local closestDistance = math.huge
-        local myPos = workspace.CurrentCamera.CFrame.Position
-        
-        for _, player in pairs(Liquidation.Services.Players:GetPlayers()) do
-            if player ~= Liquidation.Player and player.Character then
-                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-                if humanoid and humanoid.Health > 0 and rootPart then
-                    local distance = (rootPart.Position - myPos).Magnitude
-                    if distance < closestDistance then
-                        closestDistance = distance
-                        closestPlayer = player
-                    end
-                end
-            end
-        end
-        return closestPlayer
-    end
-    
-    local function getSpearRemote()
-        local success, result = pcall(function()
-            return Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Killers"):WaitForChild("Veil"):WaitForChild("Spearthrow")
-        end)
-        return success and result or nil
-    end
-    
-    local function setupHook()
-        if oldNamecall then return end
-        
-        remote = getSpearRemote()
-        if not remote then return false end
-        
-        oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            
-            if method == "FireServer" and self == remote and enabled and active and not isFiring then
-                local direction, num = ...
-                
-                if direction and typeof(direction) == "Vector3" and num then
-                    local target = GetClosestPlayer()
-                    if target and target.Character then
-                        local targetPart = target.Character:FindFirstChild("HumanoidRootPart")
-                        if targetPart then
-                            local cameraPos = workspace.CurrentCamera.CFrame.Position
-                            local newDirection = (targetPart.Position - cameraPos).Unit
-                            isFiring = true
-                            remote:FireServer(newDirection, num)
-                            isFiring = false
-                            return nil
-                        end
-                    end
-                end
-            end
-            
-            return oldNamecall(self, ...)
-        end))
-        
-        return true
-    end
-    
-    local function removeHook()
-        if oldNamecall then
-            oldNamecall = nil
-        end
-    end
-    
-    local function updateSpearAimbotState()
-        if enabled and isKillerTeam() then
-            if not oldNamecall then
-                setupHook()
-            end
-        else
-            removeHook()
-        end
-    end
-    
-    local function Enable()
-        if enabled then return end
-        enabled = true
-        Liquidation.States.SpearAimbotEnabled = true
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        
-        teamListeners = {}
-        
-        table.insert(teamListeners, setupTeamListener(updateSpearAimbotState))
-        
-        updateSpearAimbotState()
-    end
-    
-    local function Disable()
-        if not enabled then return end
-        enabled = false
-        Liquidation.States.SpearAimbotEnabled = false
-        
-        removeHook()
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        teamListeners = {}
-    end
-    
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end,
-        Toggle = function()
-            active = not active
-            return active
-        end
-    }
+local enabled, active = false, true
+local player, rs = Liquidation.Player, Liquidation.Services.ReplicatedStorage
+local env = getgenv and getgenv() or _G
+local hookKey = "LiquidationVeilSpearHookV1"
+local H = env[hookKey]
+if type(H) ~= "table" then H = {}; env[hookKey] = H end
+local remote, listener, resetListener, predictor, oldPredict, predictWrapper, handler
+local pending, lastSpeed, unsupported = nil, nil, false
+local speed, gravity, lifetime, spawnOffset = 165, Vector3.new(0, -98.1, 0), 4, 3
+local world
+local function finite(n) return type(n) == "number" and n == n and math.abs(n) < 1e8 end
+local function vector(v) return typeof(v) == "Vector3" and finite(v.X) and finite(v.Y) and finite(v.Z) end
+local function sameDirection(a, b)
+return vector(a) and vector(b) and (a - b).Magnitude < 0.001
+end
+local function solve(origin, target, velocity, power, acceleration, maxTime, offset)
+if not vector(origin) or not vector(target) or not vector(velocity) or not vector(acceleration) or not finite(power) or power <= 0 or not finite(maxTime) or maxTime <= 0 then return end
+local relative = target - origin
+if relative.Magnitude <= offset + 0.05 then return end
+local function errorAt(t)
+local displacement = relative + velocity * t - acceleration * (0.5 * t * t)
+local reach = power * t + offset
+return displacement:Dot(displacement) - reach * reach
+end
+local previousTime, previousError = 0, errorAt(0)
+for i = 1, 128 do
+local t = maxTime * (i / 128)^2
+local currentError = errorAt(t)
+if previousError >= 0 and currentError <= 0 then
+local low, high = previousTime, t
+for _ = 1, 28 do
+local middle = (low + high) * 0.5
+if errorAt(middle) > 0 then low = middle else high = middle end
+end
+local time = (low + high) * 0.5
+local displacement = relative + velocity * time - acceleration * (0.5 * time * time)
+if displacement.Magnitude > 0.001 then return displacement.Unit, time end
+return
+end
+previousTime, previousError = t, currentError
+end
+end
+local function clearPath(origin, direction, power, time, piercing, character)
+if piercing or not world or type(world.cast) ~= "function" then return true end
+local launch = origin + direction * spawnOffset
+local previous = launch
+local steps = math.clamp(math.ceil(time / 0.05), 2, 80)
+for i = 1, steps do
+local t = time * i / steps
+local position = launch + direction * power * t + gravity * (0.5 * t * t)
+if world.cast(previous, position, character) then return false end
+previous = position
+end
+return true
+end
+local function choose(origin, power, piercing)
+local character = player.Character
+local best, distance = nil, math.huge
+for _, other in ipairs(Liquidation.Services.Players:GetPlayers()) do
+local c = other.Character
+local root = c and c:FindFirstChild("HumanoidRootPart")
+local humanoid = c and c:FindFirstChildOfClass("Humanoid")
+local survivor = c and (c:HasTag("Survivor") or other.Team and other.Team.Name:lower():find("survivor", 1, true))
+if other ~= player and survivor and root and humanoid and humanoid.Health > 0 and not c:GetAttribute("Knocked") and not c:GetAttribute("IsHooked") and not c:GetAttribute("IsCarried") and vector(root.Position) then
+local d = (root.Position - origin).Magnitude
+if d < distance then
+local velocity = root.AssemblyLinearVelocity
+if not vector(velocity) then velocity = Vector3.zero end
+local direction, time = solve(origin, root.Position, velocity, power, gravity, lifetime, spawnOffset)
+if direction and clearPath(origin, direction, power, time, piercing, character) then best, distance = direction, d end
+end
+end
+end
+return best
+end
+local function rewrite(args)
+if not enabled or not active or not isKillerTeam() then return end
+local character, camera = player.Character, workspace.CurrentCamera
+if not character or not camera then return end
+local capture = pending
+local index
+if capture and os.clock() - capture.At <= 0.25 and capture.Character == character then
+for i = 1, args.n do
+if sameDirection(args[i], capture.Direction) then
+if index then return end
+index = i
+end
+end
+end
+if not index then
+capture = nil
+if vector(args[1]) and math.abs(args[1].Magnitude - 1) <= 0.02 then index = 1 end
+end
+if not index then
+if not unsupported then unsupported = true; warn("[Liquidation] Spear AimBot: unsupported throw arguments; original request preserved") end
+return
+end
+local origin = capture and capture.Origin or camera.CFrame.Position
+local power = capture and capture.Speed or lastSpeed or speed
+local piercing = character:GetAttribute("EmpoweredSpear") ~= nil
+if capture then piercing = capture.Piercing end
+local direction = choose(origin, power, piercing)
+if not direction then return end
+args[index] = direction
+if capture and oldPredict and predictor and predictor.predict == predictWrapper then
+local preview = table.clone(capture.Args)
+preview[4] = direction
+pcall(oldPredict, table.unpack(preview, 1, preview.n))
+end
+return true
+end
+local function find(path)
+local object = rs
+for name in path:gmatch("[^.]+") do object = object and object:FindFirstChild(name) end
+return object
+end
+local function requireTable(path)
+local object = find(path)
+if not object or not object:IsA("ModuleScript") then return end
+local ok, value = pcall(require, object)
+return ok and type(value) == "table" and value or nil
+end
+local function attachPredictor()
+predictor = requireTable("Modules.World.ProjectileVisualsClient")
+if not predictor or type(predictor.predict) ~= "function" then predictor = nil; return end
+oldPredict = predictor.predict
+predictWrapper = function(...)
+local args = table.pack(...)
+if enabled and active and args[1] == player.Character and vector(args[3]) and vector(args[4]) and finite(args[5]) then
+pending = {At = os.clock(), Character = args[1], Origin = args[3], Direction = args[4], Speed = math.clamp(args[5] * speed, 1, speed), Piercing = args[6] == true, Args = args}
+end
+return oldPredict(...)
+end
+predictor.predict = predictWrapper
+end
+local function installHook()
+if H.Installed then return true end
+if type(hookmetamethod) ~= "function" or type(getnamecallmethod) ~= "function" then return false end
+local wrap = type(newcclosure) == "function" and newcclosure or function(f) return f end
+local nextCall
+local replacement = wrap(function(self, ...)
+if getnamecallmethod() == "FireServer" and self == H.Remote and H.Handler then
+local args = table.pack(...)
+local ok, changed = pcall(H.Handler, args)
+if ok and changed then return nextCall(self, table.unpack(args, 1, args.n)) end
+end
+return nextCall(self, ...)
+end)
+local ok, original = pcall(hookmetamethod, game, "__namecall", replacement)
+if not ok or type(original) ~= "function" then return false end
+nextCall, H.Installed = original, true
+return true
+end
+local function Disable()
+enabled = false
+Liquidation.States.SpearAimbotEnabled = false
+if H.Handler == handler then H.Handler, H.Remote = nil, nil end
+if listener then listener:Disconnect(); listener = nil end
+if resetListener then resetListener:Disconnect(); resetListener = nil end
+if predictor and predictor.predict == predictWrapper then predictor.predict = oldPredict end
+predictor, oldPredict, predictWrapper, pending, lastSpeed = nil, nil, nil, nil, nil
+end
+local function Enable()
+if enabled then return true end
+remote = find("Remotes.Killers.Veil.Spearthrow")
+if not remote or not remote:IsA("RemoteEvent") or not installHook() then warn("[Liquidation] Spear AimBot: remote or hookmetamethod unavailable"); return false end
+local mathModule = requireTable("Modules.Killers.Veil.SpearMath")
+if mathModule then
+if finite(mathModule.Speed) and mathModule.Speed > 0 then speed = mathModule.Speed end
+if vector(mathModule.Gravity) then gravity = mathModule.Gravity end
+if finite(mathModule.MaxLife) and mathModule.MaxLife > 0 then lifetime = mathModule.MaxLife end
+if finite(mathModule.SpawnOffset) and mathModule.SpawnOffset >= 0 then spawnOffset = mathModule.SpawnOffset end
+end
+world = requireTable("Modules.Killers.Veil.SpearWorld")
+enabled, active, unsupported = true, true, false
+Liquidation.States.SpearAimbotEnabled = true
+handler, H.Remote = rewrite, remote
+H.Handler = handler
+attachPredictor()
+resetListener = player.CharacterRemoving:Connect(function() pending, lastSpeed = nil, nil end)
+local state = find("Remotes.Killers.Veil.SpearState")
+if state and state:IsA("RemoteEvent") then
+listener = state.OnClientEvent:Connect(function(action, packet)
+if action == "launch" and type(packet) == "table" and packet.Source == player.Character and finite(packet.Speed) and packet.Speed >= 1 and packet.Speed <= speed then lastSpeed = packet.Speed end
+end)
+end
+return true
+end
+return {Enable = Enable, Disable = Disable, IsEnabled = function() return enabled end, Toggle = function() active = not active; return active end}
 end)()
 
 -- MASK POWERS --
@@ -2117,7 +2171,7 @@ function Killer.Init(nxs)
 
     local SpearAimbotToggle = Tabs.Killer:AddToggle("SpearAimbot", {
         Title = "Spear AimBot (Veil)",
-        Description = "automatically aims a spear at the nearest Survivor when thrown",
+        Description = "Predicts survivor movement and compensates for spear drop when throwing.",
         Default = false
     })
 
