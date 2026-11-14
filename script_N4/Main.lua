@@ -1572,6 +1572,7 @@ AdvancedESPGroup:CreateToggle({
 });
 
 SurvivorModule.Advanced.CreateUI(Window)
+SurvivorModule.ModuleRage.CreateUI(Window)
 
 Liquidation.Window = Window
 Liquidation.Library = LiquidationLib

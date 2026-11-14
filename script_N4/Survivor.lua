@@ -487,137 +487,57 @@ local Crosshair = (function()
 end)()
 
 local TwistSilentAim = (function()
-    local enabled = false
-    local hooked = false
-    local originalNamecall = nil
-    local teamListeners = {}
-    local isFiring = false
-    local remote = nil
-    
-    local function getRemote()
-        local success = pcall(function()
-            remote = Liquidation.Services.ReplicatedStorage:WaitForChild("Remotes", 5)
-                :WaitForChild("Items", 5)
-                :WaitForChild("Twist of Fate", 5)
-                :WaitForChild("Fire", 5)
-        end)
-        return remote ~= nil
-    end
-    
-    local function GetClosestPlayer()
-        local closestPlayer = nil
-        local closestDistance = math.huge
-        local myPos = workspace.CurrentCamera.CFrame.Position
-        
-        for _, player in pairs(Liquidation.Services.Players:GetPlayers()) do
-            if player ~= Liquidation.Player and player.Character then
-                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-                if humanoid and humanoid.Health > 0 and rootPart then
-                    local distance = (rootPart.Position - myPos).Magnitude
-                    if distance < closestDistance then
-                        closestDistance = distance
-                        closestPlayer = player
-                    end
-                end
-            end
-        end
-        return closestPlayer
-    end
-    
-    local function setupHook()
-        if hooked then return true end
-        if not getRemote() then return false end
-        
-        originalNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            
-            if method == "FireServer" and self == remote and enabled and not isFiring then
-                local gunPart, direction = ...
-                
-                if gunPart and typeof(gunPart) == "Instance" and direction and typeof(direction) == "Vector3" then
-                    local target = GetClosestPlayer()
-                    if target and target.Character then
-                        local targetPart = target.Character:FindFirstChild("HumanoidRootPart")
-                        if targetPart then
-                            local cameraPos = workspace.CurrentCamera.CFrame.Position
-                            local newDirection = (targetPart.Position - cameraPos).Unit
-                            print("[Twist Silent Aim] " .. target.Name)
-                            isFiring = true
-                            remote:FireServer(gunPart, newDirection)
-                            isFiring = false
-                            return nil
-                        end
-                    end
-                end
-            end
-            
-            return originalNamecall(self, ...)
-        end))
-        
-        hooked = true
-        return true
-    end
-    
-    local function updateTwistSilentAim()
-        if enabled and isSurvivorTeam() then
-            if not setupHook() then
-                task.spawn(function()
-                    for i = 1, 5 do
-                        task.wait(1)
-                        if enabled and isSurvivorTeam() and not hooked then
-                            if setupHook() then break end
-                        end
-                    end
-                end)
-            end
-        end
-    end
-    
-    local function Enable()
-        if enabled then return end
-        enabled = true
-        Liquidation.States.TwistSilentAimEnabled = true
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        
-        teamListeners = {}
-        
-        table.insert(teamListeners, setupTeamListener(updateTwistSilentAim))
-        
-        updateTwistSilentAim()
-    end
-    
-    local function Disable()
-        if not enabled then return end
-        enabled = false
-        Liquidation.States.TwistSilentAimEnabled = false
-        
-        for _, listener in ipairs(teamListeners) do
-            if type(listener) == "table" then
-                for _, conn in ipairs(listener) do
-                    Liquidation.safeDisconnect(conn)
-                end
-            else
-                Liquidation.safeDisconnect(listener)
-            end
-        end
-        teamListeners = {}
-    end
-    
-    return {
-        Enable = Enable,
-        Disable = Disable,
-        IsEnabled = function() return enabled end
-    }
+local enabled, module, original, replacement = false
+local function target(character, origin)
+local nearest, distance = nil, 350
+for _, other in ipairs(Liquidation.Services.Players:GetPlayers()) do
+local c = other.Character
+local root = c and c:FindFirstChild("HumanoidRootPart")
+local h = c and c:FindFirstChildOfClass("Humanoid")
+if other ~= Liquidation.Player and root and h and h.Health > 0 and (c:HasTag("Killer") or other.Team and other.Team.Name:lower():find("killer", 1, true)) then
+local d = (root.Position - origin).Magnitude
+if d > 0.01 and d < distance then
+local params = RaycastParams.new()
+params.FilterType = Enum.RaycastFilterType.Exclude
+params.FilterDescendantsInstances = {character}
+local hit = workspace:Raycast(origin, root.Position - origin, params)
+if not hit or hit.Instance:IsDescendantOf(c) then nearest, distance = root, d end
+end
+end
+end
+return nearest
+end
+local function Enable()
+if enabled then return end
+local modules = Liquidation.Services.ReplicatedStorage:FindFirstChild("Modules")
+local items = modules and modules:FindFirstChild("Items")
+local folder = items and items:FindFirstChild("TwistOfFate")
+local object = folder and folder:FindFirstChild("TwistoffateEffects")
+if not object then return end
+local ok, value = pcall(require, object)
+if not ok or type(value) ~= "table" or type(value.aimDirection) ~= "function" then return end
+module, original = value, value.aimDirection
+replacement = function(character, frame)
+if enabled and character == Liquidation.Player.Character and typeof(frame) == "CFrame" then
+local root = character:FindFirstChild("HumanoidRootPart")
+local origin = root and root.Position + Vector3.new(0, 1.373, 0)
+local part = origin and target(character, origin)
+if part then
+local direction = part.Position - frame.Position
+if direction.Magnitude > 0.01 then return original(character, CFrame.lookAt(frame.Position, part.Position)) end
+end
+end
+return original(character, frame)
+end
+enabled, Liquidation.States.TwistSilentAimEnabled = true, true
+module.aimDirection = replacement
+end
+local function Disable()
+enabled, Liquidation.States.TwistSilentAimEnabled = false, false
+if module and module.aimDirection == replacement then module.aimDirection = original end
+module, original, replacement = nil, nil, nil
+end
+return {Enable = Enable, Disable = Disable, IsEnabled = function() return enabled end}
 end)()
 
 -- FAST VAULT --
@@ -3278,6 +3198,7 @@ local FastVaultToggle = Tabs.Main:AddToggle("FastVault", {
 end
 
 function Survivor.Cleanup()
+    if Survivor.ModuleRage then Survivor.ModuleRage.Cleanup() end
     if Survivor.Advanced then Survivor.Advanced.Cleanup() end
     Invisibility.Disable()
     Crosshair.Disable()
@@ -3763,6 +3684,238 @@ if rootFolder then rootFolder:Destroy(); rootFolder = nil end
 table.clear(A.Flags)
 end
 return A
+end)()
+
+Survivor.ModuleRage = (function()
+local M = {Flags = {}, DashScale = 1.5, RushScale = 1.5, DaggerScale = 0.1, ParrySpeed = 2, DashMode = "Camera", DashRange = 70}
+local player, rs, run = Liquidation.Player, Liquidation.Services.ReplicatedStorage, Liquidation.Services.RunService
+local records, modules, connections = {}, {}, {}
+local dashStates = setmetatable({}, {__mode = "k"})
+local daggerStates = setmetatable({}, {__mode = "k"})
+local disposed = false
+local binding = "LiquidationModuleRush_" .. player.UserId
+local function own(c) return c ~= nil and c == player.Character end
+local function flat(v)
+local result = Vector3.new(v.X, 0, v.Z)
+return result.Magnitude > 0.001 and result.Unit or nil
+end
+local function getModule(path)
+if modules[path] then return modules[path] end
+local object = rs:FindFirstChild("Modules")
+for name in path:gmatch("[^.]+") do object = object and object:FindFirstChild(name) end
+if not object or not object:IsA("ModuleScript") then return end
+if path == "Items.ParryingDagger.ParryClient" and type(rs:GetAttribute("ItemRechargeEpoch")) ~= "number" then return end
+local ok, value = pcall(require, object)
+if ok and type(value) == "table" then modules[path] = value; return value end
+end
+local function replace(group, path, key, make)
+local module = getModule(path)
+if not module or type(module[key]) ~= "function" then return false end
+records[group] = records[group] or {}
+for _, record in ipairs(records[group]) do if record.Module == module and record.Key == key then return true end end
+local original = module[key]
+local replacement = make(original, module)
+records[group][#records[group] + 1] = {Module = module, Key = key, Original = original, Replacement = replacement}
+module[key] = replacement
+return true
+end
+local function restore(group)
+for _, record in ipairs(records[group] or {}) do
+if record.Module[record.Key] == record.Replacement then record.Module[record.Key] = record.Original end
+end
+records[group] = nil
+end
+local function dashDirection(state)
+if M.DashMode == "Nearest Survivor" then
+local nearest, distance = nil, M.DashRange
+for _, other in ipairs(Liquidation.Services.Players:GetPlayers()) do
+local c = other.Character
+local root = c and c:FindFirstChild("HumanoidRootPart")
+local humanoid = c and c:FindFirstChildOfClass("Humanoid")
+if other ~= player and c and c:HasTag("Survivor") and root and humanoid and humanoid.Health > 20 and not c:GetAttribute("IsHooked") and not c:GetAttribute("IsCarried") then
+local d = (root.Position - state.root.Position).Magnitude
+if d < distance then
+local params = RaycastParams.new()
+params.FilterType, params.RespectCanCollide = Enum.RaycastFilterType.Exclude, true
+params.FilterDescendantsInstances = {state.character}
+local hit = workspace:Raycast(state.root.Position, root.Position - state.root.Position, params)
+if not hit or hit.Instance:IsDescendantOf(c) then nearest, distance = root, d end
+end
+end
+end
+if nearest then
+local lead = math.min(distance / (102.5 * math.max(state.speed, 0.1)), 0.25)
+return flat(nearest.Position + nearest.AssemblyLinearVelocity * lead - state.root.Position)
+end
+return nil
+end
+local camera = workspace.CurrentCamera
+return camera and flat(camera.CFrame.LookVector)
+end
+local function releaseDashes()
+for state, saved in pairs(dashStates) do
+if rawget(state, "step") == saved.Wrapper then rawset(state, "step", saved.OwnStep) end
+if not state.stopped and type(state.speed) == "number" and saved.Scale ~= 0 then state.speed /= saved.Scale end
+dashStates[state] = nil
+end
+end
+local function installDash()
+replace("Dash", "Killers.HiddenMarkDash", "new", function(original)
+return function(character, direction, ...)
+local state = original(character, direction, ...)
+if not own(character) or type(state) ~= "table" or type(state.step) ~= "function" then return state end
+local saved = {OwnStep = rawget(state, "step"), Step = state.step, Scale = 1}
+saved.Wrapper = function(self, dt)
+if not disposed and own(self.character) and not self.stopped and not self.finishing then
+local scale = M.Flags.HiddenDistance and M.DashScale or 1
+if type(self.speed) == "number" then self.speed = self.speed * scale / saved.Scale end
+saved.Scale = scale
+if M.Flags.HiddenSteering then
+local selected = dashDirection(self)
+if selected then self.direction = selected end
+end
+end
+return saved.Step(self, dt)
+end
+state.step, dashStates[state] = saved.Wrapper, saved
+return state
+end
+end)
+end
+local function installDagger()
+replace("Dagger", "Items.ParryingDagger.ParryClient", "_startCooldown", function(original)
+return function(self, duration, ...)
+if own(self.character) then
+daggerStates[self] = true
+if M.Flags.DaggerCooldown and type(duration) == "number" then duration = math.max(0.05, duration * M.DaggerScale) end
+end
+return original(self, duration, ...)
+end
+end)
+replace("Dagger", "Items.ParryingDagger.ParryClient", "CanUse", function(original)
+return function(self, ...)
+if own(self.character) and M.Flags.DaggerCooldown and self.isParryOnCooldown and not self.isParryLocked and not self.isParryResolving then self:_clearCooldown() end
+return original(self, ...)
+end
+end)
+replace("Dagger", "Items.ParryingDagger.ParryClient", "Parry", function(original)
+return function(self, ...)
+local active = true
+if own(self.character) and M.Flags.DaggerRecovery then
+daggerStates[self] = true
+task.defer(function()
+local track = self.parryTrack
+if active and not disposed and M.Flags.DaggerRecovery and own(self.character) and track and track.IsPlaying then
+local saved = {Track = track, Speed = track.Speed, Applied = M.ParrySpeed}
+daggerStates[self] = saved
+track:AdjustSpeed(M.ParrySpeed)
+end
+end)
+end
+local result = table.pack(original(self, ...))
+active = false
+local saved = daggerStates[self]
+if type(saved) == "table" and saved.Track.Speed == saved.Applied then saved.Track:AdjustSpeed(saved.Speed) end
+daggerStates[self] = nil
+return table.unpack(result, 1, result.n)
+end
+end)
+end
+local function restoreDaggerTracks()
+for context, saved in pairs(daggerStates) do
+if type(saved) == "table" and saved.Track.Speed == saved.Applied then saved.Track:AdjustSpeed(saved.Speed) end
+daggerStates[context] = nil
+end
+end
+function M.Refresh()
+if M.Flags.HiddenDistance or M.Flags.HiddenSteering then installDash() else releaseDashes(); restore("Dash") end
+if M.Flags.DaggerCooldown or M.Flags.DaggerRecovery then installDagger() else restoreDaggerTracks(); restore("Dagger") end
+if M.Flags.TwistCharge then
+replace("TwistCharge", "Items.TwistOfFate.TwistoffateTuning", "stepFor", function(original, module)
+return function(held, ...)
+if M.Flags.TwistCharge and player.Character then return #module.STEPS end
+return original(held, ...)
+end
+end)
+else restore("TwistCharge") end
+end
+function M.Set(key, value)
+if disposed then return end
+M.Flags[key] = value == true
+if key == "DaggerRecovery" and not value then restoreDaggerTracks() end
+M.Refresh()
+end
+local function rushContext()
+local character = player.Character
+local root = character and character:FindFirstChild("HumanoidRootPart")
+local h = character and character:FindFirstChildOfClass("Humanoid")
+local mover = root and root:FindFirstChild("RushVelocity")
+if not h or h.Health <= 0 or not mover or not mover:IsA("LinearVelocity") or root.Anchored then return end
+for _, attribute in ipairs({"IsCarried", "IsHooked", "Trapped", "Chained", "IsStunned"}) do if character:GetAttribute(attribute) == true then return end end
+return character, root, h, mover
+end
+run:BindToRenderStep(binding .. "Steering", Enum.RenderPriority.Character.Value, function()
+if disposed or not M.Flags.ShieldSteering or Liquidation.Services.UserInputService:GetFocusedTextBox() then return end
+local c, root, h, mover = rushContext()
+if not c or mover.VectorVelocity.Magnitude < 0.1 then return end
+local camera = workspace.CurrentCamera
+local direction = camera and flat(camera.CFrame.LookVector)
+if direction then h:Move(direction, false) end
+end)
+run:BindToRenderStep(binding .. "Speed", Enum.RenderPriority.Character.Value + 2, function(dt)
+if disposed or not M.Flags.ShieldSpeed or dt <= 0 then return end
+local c, root, h, mover = rushContext()
+if not c then return end
+local velocity = mover.VectorVelocity
+if velocity.Magnitude < 0.1 then return end
+local desired = Vector3.new(velocity.X * M.RushScale, velocity.Y, velocity.Z * M.RushScale)
+local params = RaycastParams.new()
+params.FilterType, params.RespectCanCollide = Enum.RaycastFilterType.Exclude, true
+params.FilterDescendantsInstances = {c}
+local hit = workspace:Blockcast(root.CFrame, Vector3.new(2, 4, 2), desired * math.min(dt, 0.1), params)
+if hit then desired = desired.Unit * math.min(desired.Magnitude, math.max(0, hit.Distance - 0.2) / math.min(dt, 0.1)) end
+mover.VectorVelocity = desired
+end)
+connections[#connections + 1] = rs:GetAttributeChangedSignal("ItemRechargeEpoch"):Connect(function() if not disposed then M.Refresh() end end)
+connections[#connections + 1] = player.CharacterRemoving:Connect(function() releaseDashes(); restoreDaggerTracks() end)
+function M.CreateUI(window)
+local tab = window:CreateTab({Name = "Rage"})
+local hidden = tab:CreateGroup({Name = "Hidden Dash", Column = "Left"})
+local shield = tab:CreateGroup({Name = "Riot Shield", Column = "Right"})
+local dagger = tab:CreateGroup({Name = "Parrying Dagger", Column = "Left"})
+local twist = tab:CreateGroup({Name = "Twist of Fate", Column = "Right"})
+local function toggle(group, key, name, description)
+group:CreateToggle({Name = name, Description = description, Default = false, Callback = function(value) M.Set(key, value) end})
+end
+local function slider(group, key, name, minimum, maximum, default)
+group:CreateSlider({Name = name, Min = minimum, Max = maximum, Default = default, Rounding = 2, Callback = function(value) M[key] = value end})
+end
+toggle(hidden, "HiddenDistance", "[Experimental] Hidden Dash Distance", "Extends the native dash while keeping its wall checks.")
+slider(hidden, "DashScale", "Dash Distance Multiplier", 1, 2.5, 1.5)
+toggle(hidden, "HiddenSteering", "Hidden Dash Steering", "Steers an active dash with the camera or toward a survivor.")
+hidden:CreateCombobox({Name = "Dash Steering Mode", Options = {"Camera", "Nearest Survivor"}, Default = "Camera", Callback = function(value) M.DashMode = value or "Camera" end})
+slider(hidden, "DashRange", "Dash Target Range", 10, 100, 70)
+toggle(shield, "ShieldSpeed", "[Experimental] Shield Rush Speed", "Accelerates the active shield rush with collision checks.")
+slider(shield, "RushScale", "Shield Rush Multiplier", 1, 2.5, 1.5)
+toggle(shield, "ShieldSteering", "Shield Rush Camera Steering", "Uses camera direction to steer the native shield rush.")
+toggle(dagger, "DaggerCooldown", "[Experimental] No CD Parry", "Clears local reusable parry recovery; server cooldowns may remain.")
+slider(dagger, "DaggerScale", "Dagger Recovery Multiplier", 0, 1, 0.1)
+toggle(dagger, "DaggerRecovery", "[Experimental] Fast Parry Recovery", "Speeds up the parry animation and releases its local action lock sooner.")
+slider(dagger, "ParrySpeed", "Parry Animation Speed", 1, 4, 2)
+toggle(twist, "TwistCharge", "[Experimental] Twist Full Charge", "Selects the highest native shot charge step; server validation may remain.")
+end
+function M.Cleanup()
+disposed = true
+run:UnbindFromRenderStep(binding .. "Steering")
+run:UnbindFromRenderStep(binding .. "Speed")
+for _, connection in ipairs(connections) do connection:Disconnect() end
+table.clear(connections)
+releaseDashes()
+restoreDaggerTracks()
+for group in pairs(records) do restore(group) end
+table.clear(M.Flags)
+end
+return M
 end)()
 
 return Survivor
