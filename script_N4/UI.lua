@@ -408,7 +408,7 @@ GUI_OVERLAY_TRANSPARENCY = 0
 GUI_DISABLED_TRANSPARENCY = 0.78
 
 local themes = {
-    Noir = {{98,188,255},{9,9,12},{12,12,16},{9,9,12},{24,25,31},{50,52,60},{236,238,243},{163,168,180},{6,14,24},{244,201,224}},
+    Noir = {{255,255,255},{9,9,12},{12,12,16},{9,9,12},{24,25,31},{50,52,60},{236,238,243},{163,168,180},{0,0,0},{170,172,180}},
     Arctic = {{105,213,255},{8,17,28},{12,26,41},{15,32,49},{20,42,62},{60,107,138},{234,248,255},{143,181,202},{6,20,30},{214,240,255}},
     Amethyst = {{197,149,255},{20,12,31},{29,18,44},{35,22,51},{46,30,66},{104,73,137},{249,239,255},{183,155,207},{24,11,37},{255,205,235}},
     Emerald = {{102,237,174},{8,23,19},{12,32,27},{16,40,33},{23,50,42},{59,115,92},{233,255,244},{139,184,162},{5,28,19},{225,255,190}},
@@ -4799,7 +4799,7 @@ function NexusUI:CreateWindow(options)
             if tab.underline then
                 tab.underline.Visible = selected
             end
-            if tab.label then bind(tab.label, "TextColor3", selected and textColor or dimText) end
+            if tab.label then bind(tab.label, "TextColor3", selected and textColor or dimColor) end
             tab.page.Visible = selected
             tab.page.GroupTransparency = 0
             tab.page.Position = UDim2.fromOffset(0,0)
@@ -4828,22 +4828,18 @@ function NexusUI:CreateWindow(options)
     end
 
     function window:AddTab(tabData)
-        local right = tabData and tabData.Badge and 30 or 9
-        local tabButton = bind(new("TextButton", {Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, Text = string.upper(tostring(tabData and tabData.Title or "Tab")), TextSize = TS, AutoButtonColor = false, LayoutOrder = #tabs + 1, ZIndex = 4}, tabStrip), "TextColor3", dimText)
-        new("UIPadding", {PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, right)}, tabButton)
+        local right = tabData and tabData.Badge and 30 or 7
+        local tabButton = bind(new("TextButton", {Size = UDim2.new(0, 0, 1, -8), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, Text = string.upper(tostring(tabData and tabData.Title or "Tab")), TextSize = 11, AutoButtonColor = false, LayoutOrder = #tabs + 1, ZIndex = 4}, tabStrip), "TextColor3", dimColor)
+        new("UIPadding", {PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, right)}, tabButton)
         local tabLabel = tabButton
-        local tabUnderline = new("Frame", {Size = UDim2.new(1, 9 + right, 1, 0), Position = UDim2.fromOffset(-9, 0), BackgroundTransparency = 1, Visible = false, ZIndex = 4}, tabButton)
-        new("UIGradient", {Rotation = 90, Transparency = NumberSequence.new(1, 0.87)}, bind(new("Frame", {Size = UDim2.new(1, 0, 0, 24), Position = UDim2.new(0, 0, 1, -24), BorderSizePixel = 0}, tabUnderline), "BackgroundColor3", accentColor))
-        local tabGlow = icon("glow", 0, 14, accentColor, tabUnderline)
-        tabGlow.Size, tabGlow.Position, tabGlow.ImageTransparency = UDim2.new(1, -(right - 9), 0, 14), UDim2.new(0.5, -(right - 9) / 2, 1, -1), 0.4
-        local tabLine = new("Frame", {Size = UDim2.new(1, -(9 + right), 0, 2), Position = UDim2.new(0, 9, 1, -2), BackgroundColor3 = WHITE, BorderSizePixel = 0}, tabUnderline)
-        corner(tabLine, 1)
-        bind(new("UIGradient", {}, tabLine), "Color", function() return ColorSequence.new(ACCENT2, ACCENT) end)
-        if right > 9 then
+        local tabUnderline = bind(new("Frame", {Size = UDim2.new(1, -8, 0, 2), Position = UDim2.new(0, 4, 1, 3), BorderSizePixel = 0, Visible = false, ZIndex = 4}, tabButton), "BackgroundColor3", accentColor)
+        local tabGlow = icon("glow", 0, 12, accentColor, tabUnderline)
+        tabGlow.Size, tabGlow.ImageTransparency = UDim2.new(1, 14, 0, 12), 0.3
+        if right > 7 then
             new("TextLabel", {Name = "TabBadge", Size = UDim2.fromOffset(26, 10), Position = UDim2.new(1, 2, 0.5, -11), BackgroundTransparency = 1, Text = tostring(tabData.Badge), TextColor3 = GOOD, FontFace = TEXT_FONT, TextSize = 7, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5}, tabButton)
         end
         TrackGuiConnection(tabButton.MouseEnter:Connect(function() if not tabUnderline.Visible then bind(tabButton, "TextColor3", textColor) end end))
-        TrackGuiConnection(tabButton.MouseLeave:Connect(function() if not tabUnderline.Visible then bind(tabButton, "TextColor3", dimText) end end))
+        TrackGuiConnection(tabButton.MouseLeave:Connect(function() if not tabUnderline.Visible then bind(tabButton, "TextColor3", dimColor) end end))
 
         local tabPage = Instance.new("CanvasGroup")
         tabPage.Size = UDim2.new(1, 0, 1, 0)
@@ -4903,8 +4899,7 @@ function NexusUI:CreateWindow(options)
         end
         local function createSection(title, side, order)
             title = tostring(title)
-            local rage = string.find(string.lower(title .. " " .. tostring(tabData and tabData.Title)), "rage", 1, true) ~= nil
-            local function accent() return rage and RAGE or ACCENT end
+            local accent = accentColor
             local group = bind(new("Frame", {Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 0.64, BorderSizePixel = 0, LayoutOrder = order}), "BackgroundColor3", function() return COLOR_GROUP end)
             group:SetAttribute("ColumnHome", side)
             corner(group, 9)
@@ -5001,7 +4996,7 @@ function NexusUI:CreateWindow(options)
             local function refresh(animated)
                 local on = enabled and not locked
                 setSwitch(switch, {BackgroundColor3 = on and accent() or COLOR_TEXT, BackgroundTransparency = on and 0 or locked and 0.97 or 0.94}, animated)
-                setSwitch(knob, {Position = on and UDim2.new(1, -(KNOB + 3.5), 0.5, 0) or UDim2.new(0, 3.5, 0.5, 0), BackgroundColor3 = on and WHITE or COLOR_TEXT_DIM:Lerp(COLOR_WINDOW, 0.15), BackgroundTransparency = locked and 0.55 or 0}, animated)
+                setSwitch(knob, {Position = on and UDim2.new(1, -(KNOB + 3.5), 0.5, 0) or UDim2.new(0, 3.5, 0.5, 0), BackgroundColor3 = on and COLOR_ON_ACCENT or COLOR_TEXT_DIM:Lerp(COLOR_WINDOW, 0.15), BackgroundTransparency = locked and 0.55 or 0}, animated)
                 setSwitch(glow, {ImageTransparency = on and 0.5 or 1}, animated)
                 switchStroke.Transparency = on and 1 or 0.86
                 bind(label, "TextColor3", locked and dimColor or textColor)
