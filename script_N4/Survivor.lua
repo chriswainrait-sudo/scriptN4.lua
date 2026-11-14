@@ -487,55 +487,160 @@ local Crosshair = (function()
 end)()
 
 local TwistSilentAim = (function()
-local enabled, module, original, replacement = false
-local function target(character, origin)
-local nearest, distance = nil, 350
+local enabled = false
+local player, rs = Liquidation.Player, Liquidation.Services.ReplicatedStorage
+local collection = game:GetService("CollectionService")
+local env = getgenv and getgenv() or _G
+local key = "LiquidationTwistAimHookV1"
+local H = env[key]
+if type(H) ~= "table" then H = {}; env[key] = H end
+local module, replacement, original, handler, remote
+local function vector(v)
+return typeof(v) == "Vector3" and v.X == v.X and v.Y == v.Y and v.Z == v.Z and v.Magnitude < 1e7
+end
+local function isKiller(character, owner)
+return character and (character:HasTag("Killer") or owner and owner.Team and owner.Team.Name:lower():find("killer", 1, true))
+end
+local function isSurvivor(character, owner)
+return character and (character:HasTag("Survivor") or character:HasTag("SurvivorBot") or owner and owner.Team and owner.Team.Name:lower():find("survivor", 1, true))
+end
+local function exclusion(character)
+local list, seen = {character}, {[character] = true}
 for _, other in ipairs(Liquidation.Services.Players:GetPlayers()) do
 local c = other.Character
-local root = c and c:FindFirstChild("HumanoidRootPart")
-local h = c and c:FindFirstChildOfClass("Humanoid")
-if other ~= Liquidation.Player and root and h and h.Health > 0 and (c:HasTag("Killer") or other.Team and other.Team.Name:lower():find("killer", 1, true)) then
-local d = (root.Position - origin).Magnitude
-if d > 0.01 and d < distance then
+if c and not seen[c] and isSurvivor(c, other) then list[#list + 1], seen[c] = c, true end
+end
+for _, tag in ipairs({"Survivor", "SurvivorBot"}) do
+for _, c in ipairs(collection:GetTagged(tag)) do
+if not seen[c] then list[#list + 1], seen[c] = c, true end
+end
+end
+return list
+end
+local function muzzle(character)
+local root = character and character:FindFirstChild("HumanoidRootPart")
+if not root then return end
+local center = root.Position + Vector3.new(0, 1.373, 0)
+local point = (root.CFrame * CFrame.new(0.7, 1.373, -2.5)).Position
+local delta = point - center
+if delta.Magnitude < 0.001 then return center end
 local params = RaycastParams.new()
 params.FilterType = Enum.RaycastFilterType.Exclude
 params.FilterDescendantsInstances = {character}
-local hit = workspace:Raycast(origin, root.Position - origin, params)
-if not hit or hit.Instance:IsDescendantOf(c) then nearest, distance = root, d end
+params.IgnoreWater = true
+local hit = workspace:Blockcast(CFrame.lookAt(center, point), Vector3.new(0.5, 0.5, 0.5), delta, params)
+return hit and hit.Position - delta.Unit * 0.5 or point
+end
+local function visible(origin, part, target, excluded)
+local delta = part.Position - origin
+if delta.Magnitude < 0.01 then return false end
+local params = RaycastParams.new()
+params.FilterType = Enum.RaycastFilterType.Exclude
+params.IgnoreWater = true
+local filter = table.clone(excluded)
+for _ = 1, 12 do
+params.FilterDescendantsInstances = filter
+local hit = workspace:Blockcast(CFrame.lookAt(origin, part.Position), Vector3.new(0.5, 0.5, 0.5), delta, params)
+if not hit then return true end
+local object = hit.Instance
+local accessory = object:FindFirstAncestorWhichIsA("Accessory")
+if accessory then filter[#filter + 1] = accessory
+elseif object:IsA("BasePart") and object.Transparency > 0.01 and object.Name ~= "HumanoidRootPart" and not object:HasTag("TrueInvis") then filter[#filter + 1] = object
+elseif object:IsDescendantOf(target) then return true
+else return false end
+end
+return false
+end
+local function aim(character)
+if not enabled or character ~= player.Character then return end
+local h = character and character:FindFirstChildOfClass("Humanoid")
+if not h or h.Health <= 0 then return end
+local origin = muzzle(character)
+if not vector(origin) then return end
+local excluded, checked = exclusion(character), {}
+local nearest, distance = nil, 1000
+local function inspect(c, owner)
+if not c or c == character or checked[c] or not isKiller(c, owner) or not c:IsDescendantOf(workspace) then return end
+checked[c] = true
+local humanoid = c:FindFirstChildOfClass("Humanoid")
+local root = c:FindFirstChild("HumanoidRootPart")
+if not humanoid or humanoid.Health <= 0 or not root or not vector(root.Position) then return end
+local d = (root.Position - origin).Magnitude
+if d >= distance then return end
+for _, name in ipairs({"UpperTorso", "Torso", "HumanoidRootPart", "Head"}) do
+local part = c:FindFirstChild(name)
+if part and part:IsA("BasePart") and vector(part.Position) and visible(origin, part, c, excluded) then
+local delta = part.Position - origin
+if delta.Magnitude > 0.01 then nearest, distance = delta.Unit, d; return end
 end
 end
 end
+for _, other in ipairs(Liquidation.Services.Players:GetPlayers()) do inspect(other.Character, other) end
+for _, c in ipairs(collection:GetTagged("Killer")) do inspect(c) end
 return nearest
 end
-local function Enable()
-if enabled then return end
-local modules = Liquidation.Services.ReplicatedStorage:FindFirstChild("Modules")
-local items = modules and modules:FindFirstChild("Items")
-local folder = items and items:FindFirstChild("TwistOfFate")
-local object = folder and folder:FindFirstChild("TwistoffateEffects")
-if not object then return end
-local ok, value = pcall(require, object)
-if not ok or type(value) ~= "table" or type(value.aimDirection) ~= "function" then return end
-module, original = value, value.aimDirection
-replacement = function(character, frame)
-if enabled and character == Liquidation.Player.Character and typeof(frame) == "CFrame" then
-local root = character:FindFirstChild("HumanoidRootPart")
-local origin = root and root.Position + Vector3.new(0, 1.373, 0)
-local part = origin and target(character, origin)
-if part then
-local direction = part.Position - frame.Position
-if direction.Magnitude > 0.01 then return original(character, CFrame.lookAt(frame.Position, part.Position)) end
+local function rewrite(args)
+if not enabled or not vector(args[2]) then return end
+local character, tool = player.Character, args[1]
+if not character or typeof(tool) ~= "Instance" or not tool:IsDescendantOf(character) then return end
+local direction = aim(character)
+if direction then args[2] = direction; return true end
 end
+local function installHook()
+if H.Installed then return true end
+if type(hookmetamethod) ~= "function" or type(getnamecallmethod) ~= "function" then return false end
+local wrap = type(newcclosure) == "function" and newcclosure or function(f) return f end
+local nextCall
+local hook = wrap(function(self, ...)
+if getnamecallmethod() == "FireServer" and self == H.Remote and H.Handler then
+local args = table.pack(...)
+local ok, changed = pcall(H.Handler, args)
+if ok and changed then return nextCall(self, table.unpack(args, 1, args.n)) end
 end
-return original(character, frame)
-end
-enabled, Liquidation.States.TwistSilentAimEnabled = true, true
-module.aimDirection = replacement
+return nextCall(self, ...)
+end)
+local ok, value = pcall(hookmetamethod, game, "__namecall", hook)
+if not ok or type(value) ~= "function" then return false end
+nextCall, H.Installed = value, true
+return true
 end
 local function Disable()
 enabled, Liquidation.States.TwistSilentAimEnabled = false, false
+if H.Handler == handler then H.Handler, H.Remote = nil, nil end
 if module and module.aimDirection == replacement then module.aimDirection = original end
-module, original, replacement = nil, nil, nil
+module, replacement, original, handler, remote = nil, nil, nil, nil, nil
+end
+local function Enable()
+if enabled then return true end
+local remotes = rs:FindFirstChild("Remotes")
+local items = remotes and remotes:FindFirstChild("Items")
+local folder = items and items:FindFirstChild("Twist of Fate")
+remote = folder and folder:FindFirstChild("Fire")
+if not remote or not remote:IsA("RemoteEvent") then warn("[Liquidation] Twist Silent Aim: Fire remote unavailable"); return false end
+local hooked = installHook()
+enabled, Liquidation.States.TwistSilentAimEnabled = true, true
+handler, H.Remote = rewrite, remote
+H.Handler = handler
+local modules = rs:FindFirstChild("Modules")
+local itemModules = modules and modules:FindFirstChild("Items")
+local twist = itemModules and itemModules:FindFirstChild("TwistOfFate")
+local object = twist and twist:FindFirstChild("TwistoffateEffects")
+if object then
+local ok, value = pcall(require, object)
+if ok and type(value) == "table" and type(value.aimDirection) == "function" then
+local nextAim = value.aimDirection
+local wrapper = function(character, frame)
+if enabled and character == player.Character then
+local ok, direction = pcall(aim, character)
+if ok and direction then return direction end
+end
+return nextAim(character, frame)
+end
+if pcall(function() value.aimDirection = wrapper end) then module, original, replacement = value, nextAim, wrapper end
+end
+end
+if not hooked and not module then Disable(); warn("[Liquidation] Twist Silent Aim: executor does not support an available aim hook"); return false end
+return true
 end
 return {Enable = Enable, Disable = Disable, IsEnabled = function() return enabled end}
 end)()
